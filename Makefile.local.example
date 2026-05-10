@@ -1,2 +1,8 @@
+# Copy this file to Makefile.local — it is gitignored so your credentials stay local
+# cp Makefile.local.example Makefile.local
+
+# Your AWS account ID — found top-right in the AWS console
 ACCOUNT=123456789012
+
+# AWS region where your ECR repos live
 REGION=us-east-1

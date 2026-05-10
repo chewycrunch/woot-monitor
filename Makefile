@@ -1,5 +1,6 @@
 .PHONY: login build push deploy monitor tls-client
 
+# Personal overrides — copy Makefile.local.example to Makefile.local and fill in your values
 -include Makefile.local
 
 ACCOUNT?=your-aws-account-id
