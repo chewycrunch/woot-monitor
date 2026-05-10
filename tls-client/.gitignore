@@ -1,0 +1,6 @@
+.idea
+# .vscode
+cmd/tls-client-api/config.*.yml
+!cmd/tls-client-api/config.dist.yml
+cmd/tls-client-api/TLS_Client_API
+/dist/

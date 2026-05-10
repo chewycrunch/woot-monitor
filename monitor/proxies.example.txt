@@ -1,0 +1,5 @@
+# Proxy list format: ip:port:username:password
+# Place files in monitor/proxies/ (gitignored)
+# Example:
+192.0.2.1:5000:myuser:mypassword
+192.0.2.2:5001:myuser:mypassword

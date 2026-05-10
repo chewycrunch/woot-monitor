@@ -1,0 +1,12 @@
+services:
+  monitor:
+    build:
+      context: ./monitor
+      dockerfile: Dockerfile
+    image: 794038239303.dkr.ecr.us-east-1.amazonaws.com/woot-monitor/monitor:latest
+
+  tls-client:
+    build:
+      context: ./tls-client
+      dockerfile: Dockerfile
+    image: 794038239303.dkr.ecr.us-east-1.amazonaws.com/woot-monitor/tls-client:latest
