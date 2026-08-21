@@ -32,6 +32,6 @@ cd monitor && cargo run    # in another shell
 To point the monitor at an API somewhere else, set `TLS_API_URL`
 (see `monitor/.env.example`; `.env` is loaded at startup).
 
-`compose.yml` stays what it has always been — a build-and-push manifest for ECR, not
-a way to run the stack.
+`compose.yml` stays what it has always been — a build-and-push manifest, not a way to
+run the stack. Images are published to GHCR with `task deploy`.
 

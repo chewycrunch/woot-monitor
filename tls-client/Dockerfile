@@ -2,9 +2,13 @@
 # https://github.com/bogdanfinn/tls-client-api/releases
 ARG TLS_CLIENT_API_VERSION=v1.15.1
 
-FROM golang:1.24-bookworm AS builder
+# Runs on the host's own architecture and cross-compiles to the target, so a
+# multi-arch build costs one native Go build per arch rather than an emulated one.
+FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
 
 ARG TLS_CLIENT_API_VERSION
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /src
 
@@ -13,9 +17,14 @@ RUN git clone --depth 1 --branch "${TLS_CLIENT_API_VERSION}" \
 
 RUN go mod download && go mod verify
 
-RUN CGO_ENABLED=0 go build -o /out/tls-client-api ./cmd/tls-client-api/main.go
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+      go build -o /out/tls-client-api ./cmd/tls-client-api/main.go
 
 FROM alpine
+
+# Links the GHCR package to this repo, so it inherits the repo's README and
+# shows up on the repo page instead of floating unattached under the account.
+LABEL org.opencontainers.image.source=https://github.com/chewycrunch/woot-monitor
 
 WORKDIR /app
 

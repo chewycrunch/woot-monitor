@@ -3,10 +3,20 @@ services:
     build:
       context: ./monitor
       dockerfile: Dockerfile
-    image: 794038239303.dkr.ecr.us-east-1.amazonaws.com/woot-monitor/monitor:latest
+      # Rust/musl cannot cross-compile here — each muslrust image only carries its
+      # own arch's toolchain — so the non-native arch builds under emulation and is
+      # slow. Publish from CI with a native runner per arch if that becomes painful.
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    image: ghcr.io/chewycrunch/woot-monitor/monitor:latest
 
   tls-client:
     build:
       context: ./tls-client
       dockerfile: Dockerfile
-    image: 794038239303.dkr.ecr.us-east-1.amazonaws.com/woot-monitor/tls-client:latest
+      # Go cross-compiles, so both arches are cheap to build.
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    image: ghcr.io/chewycrunch/woot-monitor/tls-client:latest
