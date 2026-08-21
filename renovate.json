@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Bump the pinned tls-client-api release, which is a plain Docker ARG no standard manager sees",
+      "managerFilePatterns": [
+        "tls-client/Dockerfile"
+      ],
+      "matchStrings": [
+        "ARG TLS_CLIENT_API_VERSION=(?<currentValue>v\\S+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "bogdanfinn/tls-client-api"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Our own images are built from this repo, not consumed from a registry",
+      "matchManagers": [
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "ghcr.io/chewycrunch/woot-monitor/**"
+      ],
+      "enabled": false
+    }
+  ]
+}
