@@ -3,6 +3,12 @@ name = "woot-monitor"
 version = "1.3.17"
 edition = "2021"
 
+# Module files are named after the module (`webhook.rs` beside `webhook/`),
+# never `mod.rs` — the style the Rust book calls idiomatic. Clippy ships the
+# opposing `self_named_module_files` lint too; enabling one picks a side.
+[lints.clippy]
+mod_module_files = "warn"
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
