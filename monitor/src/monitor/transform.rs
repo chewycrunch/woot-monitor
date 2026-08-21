@@ -1,7 +1,5 @@
-use crate::monitor::{
-    product::{Product, Variant},
-    woot_api::WootOffer,
-};
+use super::product::{Product, Variant};
+use super::woot_api::WootOffer;
 
 impl From<WootOffer> for Product {
     fn from(woot_offer: WootOffer) -> Self {

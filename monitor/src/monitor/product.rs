@@ -1,4 +1,8 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
+
+use super::woot_api::Photo;
 
 #[derive(Clone)]
 pub struct Product {
@@ -10,7 +14,7 @@ pub struct Product {
     pub sale_price: Option<u16>,
     pub condition: String,
     pub slug: String,
-    pub photos: Vec<crate::monitor::woot_api::Photo>,
+    pub photos: Vec<Photo>,
     pub variants: Vec<Variant>,
 }
 
@@ -20,8 +24,6 @@ pub struct Variant {
     pub list_price: Option<u16>,
     pub sale_price: Option<u16>,
 }
-
-use std::collections::HashMap;
 
 pub struct Products {
     offers: HashMap<String, Product>,

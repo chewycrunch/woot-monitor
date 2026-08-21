@@ -61,7 +61,10 @@ mod tests {
 
     #[test]
     fn returns_no_review_count_when_absent() {
-        assert_eq!(total_reviews("<html><body>no reviews here</body></html>"), None);
+        assert_eq!(
+            total_reviews("<html><body>no reviews here</body></html>"),
+            None
+        );
     }
 
     #[test]
