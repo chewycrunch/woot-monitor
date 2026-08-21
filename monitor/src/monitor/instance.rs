@@ -1,9 +1,5 @@
 // General
-use std::{collections::HashMap, sync::Arc, time::Duration};
-
-// Reqwest
-use reqwest::header::HeaderMap;
-use reqwest::{Client, ClientBuilder};
+use std::{sync::Arc, time::Duration};
 
 // Utils
 use regex::Regex;
@@ -13,8 +9,7 @@ use urlencoding::encode;
 // Project
 use super::product::{Product, Products};
 use super::tls_api::TlsClient;
-use super::woot_api::{minify_graphql, WootResponse};
-use crate::monitor::WootData;
+use super::woot_api::WootApi;
 use crate::proxy::ProxyManager;
 use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
 
@@ -23,6 +18,7 @@ pub struct MonitorInstance {
     products: Products,
     webhook_manager: WebhookManager,
     proxy_manager: Arc<ProxyManager>,
+    woot_api: WootApi,
     tls_client: TlsClient,
 }
 
@@ -32,6 +28,7 @@ impl MonitorInstance {
             delay: Duration::from_secs(5),
             products: Products::new(),
             webhook_manager,
+            woot_api: WootApi::new(Arc::clone(&proxy_manager)),
             proxy_manager,
             tls_client: TlsClient::new(),
         }
@@ -60,7 +57,7 @@ impl MonitorInstance {
     pub async fn initialize(&mut self) -> Result<u32, Box<dyn std::error::Error>> {
         info!("Initializing Monitor | Adding initial offers...");
 
-        let all_products = self.fetch_all_offers().await?;
+        let all_products = self.woot_api.fetch_all_offers().await?;
         let all_products_len = all_products.len();
 
         for product in all_products {
@@ -75,7 +72,7 @@ impl MonitorInstance {
     /// Monitors Woot for new products.
     pub async fn monitor(&mut self) {
         loop {
-            match self.fetch_all_offers().await {
+            match self.woot_api.fetch_all_offers().await {
                 Ok(products) => {
                     info!(count = products.len(), "Fetched offers");
 
@@ -109,129 +106,6 @@ impl MonitorInstance {
         }
     }
 
-    // More Internal Stuff here
-
-    /// Refactored: Fetches all offers across paginated requests
-    async fn fetch_all_offers(&self) -> Result<Vec<Product>, Box<dyn std::error::Error>> {
-        let mut all_products = Vec::new();
-
-        let limit: u16 = 200; // Number of offers to fetch per request
-        let mut skip: u8 = 0; // Number of requests to skip (skip * limit)  (Specific # of products to skip)
-
-        loop {
-            let response = self.fetch_offers(limit, skip).await?;
-
-            let data = response
-                .data
-                .ok_or("Missing `data` field in GraphQL response")?;
-            let search_offers = data
-                .search_offers
-                .ok_or("Missing `searchOffers` field in GraphQL response")?;
-
-            let offers = search_offers.offers;
-            if offers.is_empty() {
-                break;
-            }
-
-            let products: Vec<Product> = offers.into_iter().map(Product::from).collect();
-            let count: usize = products.len();
-            all_products.extend(products);
-
-            if count < limit.into() {
-                break;
-            }
-
-            skip += 1
-        }
-
-        info!(requests = skip + 1, limit, "Fetched all offers");
-
-        Ok(all_products)
-    }
-
-    /// Internal function to fetch offers from Woot by page.
-    /// Actual request to Woot's API.
-    async fn fetch_offers(
-        &self,
-        limit: u16,
-        skip: u8,
-    ) -> Result<WootResponse, Box<dyn std::error::Error>> {
-        let client = self
-            .get_reqwest_client(|builder| builder)
-            .expect("Failed to create client");
-
-        let headers = Self::get_graphql_headers();
-
-        let query = format!(
-            r#"
-                {{
-                    searchOffers(
-                        Filter: {{
-                            Categories: ["home", "tech", "pc", "tools", "sport", "grocery"],
-                            IsSoldOut: {{ exclude: true }}
-                        }},
-                        Sort: BestSelling,
-                        Limit: {},
-                        Skip: {}
-                    ) {{
-                        Offers {{
-                            Id
-                            SoldOut
-                            Title
-                            EndDate
-                            Items {{
-                                ListPrice
-                                SalePrice
-                                Attributes {{
-                                    Key
-                                    Value
-                                }}
-                            }}
-                            Photos {{
-                                Url
-                            }}
-                            Slug
-                        }}
-                    }}
-                }}"#,
-            limit,
-            (skip as u16) * limit
-        );
-
-        let minified_query = minify_graphql(&query);
-        let encoded_query = encode(&minified_query);
-        let url = format!(
-            "https://d24qg5zsx8xdc4.cloudfront.net/graphql?query={}",
-            encoded_query
-        );
-
-        let response = client.get(url).headers(headers).send().await?;
-        let body = response.text().await?;
-
-        let parsed: WootResponse = serde_json::from_str(&body)?;
-
-        if let Some(errors) = &parsed.errors {
-            if !errors.is_empty() {
-                return Err(format!("GraphQL errors: {:?}", errors).into());
-            }
-        }
-
-        let data = parsed
-            .data
-            .ok_or("Missing `data` field in GraphQL response")?;
-
-        let search_offers = data
-            .search_offers
-            .ok_or("Missing `searchOffers` field in GraphQL response")?;
-
-        Ok(WootResponse {
-            data: Some(WootData {
-                search_offers: Some(search_offers),
-            }),
-            errors: parsed.errors,
-        })
-    }
-
     /// Fetches the details of a specific offer, including ASIN and total reviews.
     pub async fn fetch_offer_details(
         &self,
@@ -245,7 +119,7 @@ impl MonitorInstance {
 
         let body = self
             .tls_client
-            .forward(url, Self::get_woot_headers(), proxy_url)
+            .forward(url, WootApi::page_headers(), proxy_url)
             .await?;
 
         let total_reviews = Self::extract_total_reviews(&body);
@@ -370,83 +244,5 @@ impl MonitorInstance {
                 },
             )
             .await;
-    }
-
-    pub fn get_reqwest_client<F>(&self, customize: F) -> Result<Client, String>
-    where
-        F: FnOnce(ClientBuilder) -> ClientBuilder,
-    {
-        let mut builder = Client::builder();
-
-        if let Some(proxy) = self.proxy_manager.get_next_proxy() {
-            if let Some(reqwest_proxy) = proxy.to_reqwest_proxy() {
-                builder = builder.proxy(reqwest_proxy);
-            } else {
-                return Err("Failed to set proxy".into());
-            }
-        }
-
-        let builder = customize(builder)
-            .connect_timeout(Duration::from_secs(5))
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(10));
-
-        builder
-            .build()
-            .map_err(|e| format!("Failed to build client: {}", e))
-    }
-
-    pub fn get_woot_headers() -> HashMap<String, String> {
-        let mut headers = HashMap::new();
-
-        headers.insert("Host".into(), "www.woot.com".into());
-        headers.insert(
-            "sec-ch-ua".into(),
-            r#""Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24""#.into(),
-        );
-        headers.insert("sec-ch-ua-mobile".into(), "?0".into());
-        headers.insert("sec-ch-ua-platform".into(), "\"Windows\"".into());
-        headers.insert("Upgrade-Insecure-Requests".into(), "1".into());
-        headers.insert(
-                "User-Agent".into(),
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36".into(),
-            );
-        headers.insert(
-                "Accept".into(),
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7".into(),
-            );
-        headers.insert("Sec-Fetch-Site".into(), "none".into());
-        headers.insert("Sec-Fetch-Mode".into(), "navigate".into());
-        headers.insert("Sec-Fetch-User".into(), "?1".into());
-        headers.insert("Sec-Fetch-Dest".into(), "document".into());
-        headers.insert("Accept-Language".into(), "en-US,en;q=0.9".into());
-
-        headers
-    }
-
-    pub fn get_graphql_headers() -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        headers.insert("Host", "d24qg5zsx8xdc4.cloudfront.net".parse().unwrap());
-        headers.insert("sec-ch-ua-platform", "\"Windows\"".parse().unwrap());
-        headers.insert("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36".parse().unwrap());
-        headers.insert(
-            "sec-ch-ua",
-            "\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\""
-                .parse()
-                .unwrap(),
-        );
-        headers.insert(
-            "x-api-key",
-            "da2-hk2jpo7aljfvxollvmieghuqlu".parse().unwrap(),
-        );
-        headers.insert("sec-ch-ua-mobile", "?0".parse().unwrap());
-        headers.insert("Accept", "*/*".parse().unwrap());
-        headers.insert("Origin", "https://www.woot.com".parse().unwrap());
-        headers.insert("Sec-Fetch-Site", "cross-site".parse().unwrap());
-        headers.insert("Sec-Fetch-Mode", "cors".parse().unwrap());
-        headers.insert("Sec-Fetch-Dest", "empty".parse().unwrap());
-        headers.insert("Referer", "https://www.woot.com/".parse().unwrap());
-        headers.insert("Accept-Language", "en-US,en;q=0.9".parse().unwrap());
-        headers
     }
 }
