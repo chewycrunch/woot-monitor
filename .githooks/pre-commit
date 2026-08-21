@@ -1,0 +1,27 @@
+#!/bin/sh
+# Formatting and lint gate, run before a commit is written.
+#
+# Deliberately does NOT run the tests: a failing test is a legitimate state to
+# commit in (write the red test, then the code that turns it green), whereas
+# unformatted or lint-dirty code never is. Run the suite yourself, or let CI do
+# it, before opening a PR.
+#
+# Installed by `task hooks` (which points core.hooksPath here). Bypass a single
+# commit with `git commit --no-verify` when you need to.
+set -e
+
+# Nothing to check unless this commit touches the Rust crate.
+if ! git diff --cached --name-only --diff-filter=ACMR \
+    | grep -qE '^monitor/(src/.*\.rs|Cargo\.(toml|lock))$'; then
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)/monitor"
+
+echo "pre-commit: cargo fmt"
+cargo fmt --check
+
+echo "pre-commit: cargo clippy"
+cargo clippy --all-targets --quiet -- -D warnings
+
+echo "pre-commit: ok"
