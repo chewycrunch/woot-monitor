@@ -26,9 +26,9 @@ tasks:
       # Needs the write:packages scope once: gh auth refresh -s write:packages
       - gh auth token | docker login ghcr.io --username $(gh api user --jq .login) --password-stdin
 
-  # bake reads the same compose.yml, but unlike `docker compose build/push` it
-  # understands the `platforms` key and pushes a real multi-arch manifest list.
-  # `docker compose push` would upload only one architecture.
+  # Targets and tags live in docker-bake.hcl. bake is what makes the multi-arch
+  # build work: `docker compose push` would upload only one architecture.
+  # Override the tag with e.g. `TAG=v1.3.17 task push`.
   build:
     desc: Build both images for every configured platform
     cmds:
