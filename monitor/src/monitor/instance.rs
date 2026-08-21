@@ -1,70 +1,39 @@
 // General
-use std::{
-    collections::HashMap,
-    env,
-    sync::{Arc, LazyLock},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 // Reqwest
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
+use reqwest::header::HeaderMap;
 use reqwest::{Client, ClientBuilder};
 
 // Utils
 use regex::Regex;
-use serde_json::json;
 use tracing::{debug, error, info};
 use urlencoding::encode;
 
 // Project
 use super::product::{Product, Products};
-
-use super::tls_api::TlsApiResponse;
-
+use super::tls_api::TlsClient;
 use super::woot_api::{minify_graphql, WootResponse};
 use crate::monitor::WootData;
 use crate::proxy::ProxyManager;
 use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
-
-/// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.
-///
-/// The default suits both a bare `cargo run` against a tls-client container
-/// publishing 8080, and an ECS task where both containers share a network
-/// namespace. Under compose the services sit on their own network, so
-/// `compose.yml` sets this to `http://tls-client:8080`.
-static BASE_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("TLS_API_URL")
-        .ok()
-        .filter(|url| !url.is_empty())
-        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string())
-});
 
 pub struct MonitorInstance {
     delay: Duration,
     products: Products,
     webhook_manager: WebhookManager,
     proxy_manager: Arc<ProxyManager>,
-    tls_client: reqwest::Client,
+    tls_client: TlsClient,
 }
 
 impl MonitorInstance {
     pub fn new(webhook_manager: WebhookManager, proxy_manager: Arc<ProxyManager>) -> Self {
-        let mut headers = HeaderMap::new();
-        headers.insert("x-api-key", HeaderValue::from_static("yawn"));
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
-        let tls_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .default_headers(headers)
-            .build()
-            .expect("Failed to create TLS forwarding client");
-
         Self {
             delay: Duration::from_secs(5),
             products: Products::new(),
-            webhook_manager: webhook_manager,
-            proxy_manager: proxy_manager,
-            tls_client,
+            webhook_manager,
+            proxy_manager,
+            tls_client: TlsClient::new(),
         }
     }
 
@@ -268,30 +237,16 @@ impl MonitorInstance {
         &self,
         url: &str,
     ) -> Result<(Option<u32>, Option<String>), Box<dyn std::error::Error>> {
-        let headers = Self::get_woot_headers();
+        let proxy_url = self
+            .proxy_manager
+            .get_next_proxy()
+            .map(|p| p.to_proxy_url())
+            .unwrap_or_default();
 
-        let payload = json!({
-            "tlsClientIdentifier": "chrome_137",
-            "requestUrl": url,
-            "requestMethod": "GET",
-            "requestHeaders": headers,
-            "followRedirects": true,
-            "proxyUrl": self.proxy_manager.get_next_proxy().map(|p| p.to_proxy_url()).unwrap_or_else(|| "".to_string()),
-        });
-
-        let response = self
+        let body = self
             .tls_client
-            .post(format!("{}/api/forward", *BASE_URL))
-            .json(&payload)
-            .send()
+            .forward(url, Self::get_woot_headers(), proxy_url)
             .await?;
-
-        let body = response.text().await?;
-
-        let tls_response: TlsApiResponse = serde_json::from_str(&body)?;
-        let session_id: String = tls_response.id;
-
-        Self::free_tls_session(session_id).await?;
 
         let total_reviews = Self::extract_total_reviews(&body);
         let asin = Self::extract_asin(&body);
@@ -493,18 +448,5 @@ impl MonitorInstance {
         headers.insert("Referer", "https://www.woot.com/".parse().unwrap());
         headers.insert("Accept-Language", "en-US,en;q=0.9".parse().unwrap());
         headers
-    }
-
-    pub async fn free_tls_session(session_id: String) -> Result<(), Box<dyn std::error::Error>> {
-        let client = reqwest::Client::new();
-
-        client
-            .post(format!("{}/api/free-session", *BASE_URL))
-            .header("x-api-key", "yawn")
-            .json(&json!({"sessionId": session_id}))
-            .send()
-            .await?;
-
-        Ok(())
     }
 }
