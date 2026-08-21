@@ -1,30 +1,29 @@
-FROM golang:1.24.4-bookworm AS base
+# Builds bogdanfinn/tls-client-api from upstream github
+# https://github.com/bogdanfinn/tls-client-api/releases
+ARG TLS_CLIENT_API_VERSION=v1.15.1
 
-WORKDIR /app
+FROM golang:1.24-bookworm AS builder
 
-COPY go.mod go.sum .
-RUN go mod download
-RUN go mod verify
+ARG TLS_CLIENT_API_VERSION
 
-FROM base AS builder
+WORKDIR /src
 
-COPY ./cmd/tls-client-api/main.go ./cmd/tls-client-api/main.go
-COPY ./internal ./internal
+RUN git clone --depth 1 --branch "${TLS_CLIENT_API_VERSION}" \
+      https://github.com/bogdanfinn/tls-client-api.git .
 
-RUN CGO_ENABLED=0 go build -o tls-client-api ./cmd/tls-client-api/main.go
+RUN go mod download && go mod verify
+
+RUN CGO_ENABLED=0 go build -o /out/tls-client-api ./cmd/tls-client-api/main.go
 
 FROM alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates yq bash
+RUN apk add --no-cache ca-certificates
 
-COPY --from=builder /app/tls-client-api /app/tls-client-api
+COPY --from=builder /out/tls-client-api /app/tls-client-api
 
-COPY ./cmd/tls-client-api/entrypoint.sh /app/entrypoint.sh
-COPY ./cmd/tls-client-api/config.dist.yml /app/config.dist.yml
+# main.go loads `<dir of executable>/config.dist.yml`
+COPY config.yml /app/config.dist.yml
 
-RUN chmod +x /app/tls-client-api
-RUN chmod +x /app/entrypoint.sh
-
-CMD ["/app/entrypoint.sh"]
+CMD ["/app/tls-client-api"]

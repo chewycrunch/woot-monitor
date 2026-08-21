@@ -6,12 +6,12 @@ app_name: api
 
 log:
   handlers:
-    #main:
-      #formatter: console
-      #level: info
-      #timestamp_format: '15:04:05:000'
-      #type: iowriter
-      #writer: stdout
+    main:
+      formatter: console
+      level: info
+      timestamp_format: '15:04:05:000'
+      type: iowriter
+      writer: stdout
 
 sentry:
   dsn: ''
