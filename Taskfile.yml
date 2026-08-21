@@ -1,0 +1,90 @@
+version: '3'
+
+# Personal settings live in .env — copy .env.example to .env and fill it in.
+dotenv: ['.env']
+
+vars:
+  REGION: '{{.REGION | default "us-east-1"}}'
+  REGISTRY: '{{.ACCOUNT}}.dkr.ecr.{{.REGION}}.amazonaws.com'
+
+  # Local tls-client API. The version tracks the Dockerfile so there is only one
+  # place to bump, and the binary is named after the release so a bump downloads
+  # the new one instead of reusing a stale cache.
+  TLS_VERSION:
+    sh: sed -n 's/^ARG TLS_CLIENT_API_VERSION=v//p' tls-client/Dockerfile
+  TLS_OS:
+    sh: uname -s | tr A-Z a-z
+  TLS_ARCH:
+    sh: uname -m | sed 's/x86_64/amd64/'
+  TLS_ASSET: 'tls-client-api-{{.TLS_OS}}-{{.TLS_ARCH}}-{{.TLS_VERSION}}'
+  LOCAL_DIR: .local/tls-client
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - task --list
+    silent: true
+
+  login:
+    desc: Authenticate Docker against ECR
+    requires:
+      vars: [ACCOUNT]
+    cmds:
+      - aws ecr get-login-password --region {{.REGION}} --profile personal
+        | docker login --username AWS --password-stdin {{.REGISTRY}}
+
+  build:
+    desc: Build both images
+    cmds:
+      - docker compose build
+
+  push:
+    desc: Push both images to ECR
+    requires:
+      vars: [ACCOUNT]
+    cmds:
+      - docker compose push
+
+  deploy:
+    desc: Log in, build and push both images
+    cmds:
+      - task: login
+      - task: build
+      - task: push
+
+  monitor:
+    desc: Build and push the monitor image
+    requires:
+      vars: [ACCOUNT]
+    cmds:
+      - docker compose build monitor
+      - docker compose push monitor
+
+  tls-client:
+    desc: Build and push the tls-client image
+    requires:
+      vars: [ACCOUNT]
+    cmds:
+      - docker compose build tls-client
+      - docker compose push tls-client
+
+  tls-client-local:
+    desc: Run the tls-client API locally from an upstream release binary
+    requires:
+      vars: [TLS_VERSION]
+    cmds:
+      - mkdir -p {{.LOCAL_DIR}}
+      - |
+        test -x {{.LOCAL_DIR}}/{{.TLS_ASSET}} || {
+          echo "Downloading {{.TLS_ASSET}}"
+          curl -fsSL --proto '=https' -o {{.LOCAL_DIR}}/{{.TLS_ASSET}} \
+            https://github.com/bogdanfinn/tls-client-api/releases/download/v{{.TLS_VERSION}}/{{.TLS_ASSET}}
+          chmod +x {{.LOCAL_DIR}}/{{.TLS_ASSET}}
+        }
+      # The binary reads ./config.dist.yml from its working directory and refuses to
+      # start without it, so link the deployed config in as the base and layer the
+      # dev overlay on top with --config.
+      - ln -sf ../../tls-client/config.yml {{.LOCAL_DIR}}/config.dist.yml
+      - ln -sf ../../tls-client/config.dev.yml {{.LOCAL_DIR}}/config.dev.yml
+      - cd {{.LOCAL_DIR}} && ./{{.TLS_ASSET}} --config config.dev.yml

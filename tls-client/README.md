@@ -7,7 +7,7 @@ the Dockerfile and our config.
 ## Updating
 
 Bump `TLS_CLIENT_API_VERSION` in the `Dockerfile` to a tag from
-[releases](https://github.com/bogdanfinn/tls-client-api/releases), then `make tls-client`.
+[releases](https://github.com/bogdanfinn/tls-client-api/releases), then `task tls-client`.
 
 ## Config
 
@@ -32,7 +32,7 @@ The auth key in `config.yml` must match the `x-api-key` the monitor sends
 ### dev vs prod
 
 `config.yml` is the config that is baked into the image and deployed. `config.dev.yml`
-is an *overlay* on it, not a second copy: `make tls-client-local` links `config.yml` in
+is an *overlay* on it, not a second copy: `task tls-client-local` links `config.yml` in
 as the base and passes the overlay with `--config`, which gosoline merges over it. Only
 the handful of keys that differ live in the overlay, so there is nothing to keep in
 sync and local runs exercise the same ports and auth keys that ship.

@@ -20,11 +20,11 @@ The monitor talks to the tls-client API at `TLS_API_URL`, defaulting to
 `http://127.0.0.1:8080`. Nothing needs Docker:
 
 ```sh
-make tls-client-local      # downloads the upstream release binary, runs it on :8080
+task tls-client-local      # downloads the upstream release binary, runs it on :8080
 cd monitor && cargo run    # in another shell
 ```
 
-`make tls-client-local` fetches the release matching the version pinned in
+`task tls-client-local` fetches the release matching the version pinned in
 `tls-client/Dockerfile` for your OS and arch, and runs it against
 `tls-client/config.dev.yml` — no Go toolchain, no build. The binary is cached in
 `.local/`, which is gitignored; delete it to pick up a version bump.

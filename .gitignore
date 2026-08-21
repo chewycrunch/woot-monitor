@@ -1,4 +1,4 @@
 monitor/proxies/proxies.txt
-Makefile.local
+.env
 .claude/
 .local/
