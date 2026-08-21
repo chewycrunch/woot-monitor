@@ -64,18 +64,16 @@ impl TlsClient {
         Self { http }
     }
 
-    /// Forwards a GET through the sidecar and returns its raw response text.
+    /// Forwards a GET through the sidecar and returns the decoded envelope.
     ///
-    /// The text is the whole `TlsApiResponse` envelope rather than the decoded
-    /// upstream body, because the callers scrape it with regexes written
-    /// against the JSON-escaped form. Each forward opens a session on the
-    /// sidecar, so the session is freed before returning.
+    /// Each forward opens a session on the sidecar, so the session is freed
+    /// before returning.
     pub async fn forward(
         &self,
         url: &str,
         headers: HashMap<String, String>,
         proxy_url: String,
-    ) -> Result<String, Box<dyn std::error::Error>> {
+    ) -> Result<TlsApiResponse, Box<dyn std::error::Error>> {
         let payload = json!({
             "tlsClientIdentifier": "chrome_137",
             "requestUrl": url,
@@ -97,7 +95,7 @@ impl TlsClient {
         let parsed: TlsApiResponse = serde_json::from_str(&body)?;
         self.free_session(&parsed.id).await?;
 
-        Ok(body)
+        Ok(parsed)
     }
 
     /// Releases a session so the sidecar does not accumulate them.

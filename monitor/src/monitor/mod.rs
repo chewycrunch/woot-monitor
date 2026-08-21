@@ -1,5 +1,6 @@
 pub mod instance;
 pub mod product;
+pub mod scrape;
 pub mod transform;
 pub mod woot_api;
 pub mod tls_api;
