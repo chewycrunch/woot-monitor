@@ -16,9 +16,6 @@ use crate::webhook::discord::{
 /// Embed accent colour.
 const COLOR: u32 = 0x00FF00;
 
-/// Prices are stored as whole cents.
-const CENTS_PER_DOLLAR: f32 = 100.0;
-
 /// Builds the announcement payload for a newly detected offer.
 pub fn offer_payload(
     product: &Product,
@@ -94,15 +91,24 @@ fn offer_fields(
     fields
 }
 
+/// Formats a whole-cent amount as dollars.
+///
+/// Integer arithmetic throughout: the value is already exact cents, and going
+/// back through a float would reintroduce the representation error that
+/// `transform::to_cents` rounds away.
+fn dollars(cents: u32) -> String {
+    format!("${}.{:02}", cents / 100, cents % 100)
+}
+
 /// Formats a variant's price, striking through the list price when the offer
 /// is a genuine discount. A missing or zero list price means "no discount to
 /// show", so only the sale price is rendered.
-fn price_label(list_price: Option<u16>, sale_price: Option<u16>) -> String {
-    let sale = sale_price.unwrap_or(0) as f32 / CENTS_PER_DOLLAR;
+fn price_label(list_price: Option<u32>, sale_price: Option<u32>) -> String {
+    let sale = dollars(sale_price.unwrap_or(0));
 
     match list_price.unwrap_or(0) {
-        0 => format!("${:.2}", sale),
-        list => format!("~~${:.2}~~ ${:.2}", list as f32 / CENTS_PER_DOLLAR, sale),
+        0 => sale,
+        list => format!("~~{}~~ {}", dollars(list), sale),
     }
 }
 
@@ -128,7 +134,7 @@ mod tests {
         }
     }
 
-    fn variant(list_price: Option<u16>, sale_price: Option<u16>) -> Variant {
+    fn variant(list_price: Option<u32>, sale_price: Option<u32>) -> Variant {
         Variant {
             attrs: None,
             list_price,
@@ -162,6 +168,20 @@ mod tests {
     #[test]
     fn renders_a_missing_sale_price_as_free() {
         assert_eq!(price_label(None, None), "$0.00");
+    }
+
+    #[test]
+    fn pads_cents_below_ten() {
+        assert_eq!(price_label(None, Some(1205)), "$12.05");
+        assert_eq!(price_label(None, Some(7)), "$0.07");
+    }
+
+    #[test]
+    fn formats_prices_above_the_old_u16_ceiling() {
+        assert_eq!(
+            price_label(Some(123456), Some(70000)),
+            "~~$1234.56~~ $700.00"
+        );
     }
 
     #[test]

@@ -3,18 +3,15 @@ use super::woot_api::WootOffer;
 
 /// Converts a price in dollars to whole cents.
 ///
-/// Two known defects, pinned by the `bug_*` tests below:
+/// Rounds rather than truncates: `f64` cannot represent most two-decimal
+/// prices exactly, and `19.99 * 100.0` is `1998.999...`, which a plain cast
+/// would turn into 1998 cents.
 ///
-/// 1. It truncates instead of rounding, and `f64` cannot represent most
-///    two-decimal prices exactly — `19.99 * 100.0` is `1998.999...`, so $19.99
-///    becomes 1998 cents and renders as "$19.98".
-/// 2. `u16` tops out at 65535 cents ($655.35). Float-to-int casts saturate
-///    rather than wrap, so a $1,234.56 item silently clamps to $655.35.
-///
-/// Fixing both means rounding and widening the cent type past `u16`, which
-/// ripples into `Product`, `Variant` and `notify::price_label`.
-fn to_cents(dollars: f64) -> u16 {
-    (dollars * 100.0) as u16
+/// The result is `u32` rather than `u16` because 65535 cents is only $655.35,
+/// and float-to-int casts saturate silently rather than wrapping — a dearer
+/// item would have clamped to that ceiling instead of failing visibly.
+fn to_cents(dollars: f64) -> u32 {
+    (dollars * 100.0).round() as u32
 }
 
 impl From<WootOffer> for Product {
@@ -258,24 +255,28 @@ mod tests {
         assert_eq!(Product::from(offer(items, None)).variants.len(), 2);
     }
 
-    // --- Characterization tests: these pin CURRENT behaviour, which is wrong.
-    // See the note above `to_cents`. Fixing the conversion should flip both.
-
     #[test]
-    fn bug_loses_a_cent_when_float_math_lands_just_under() {
-        // $19.99 * 100.0 is 1998.9999999999998 in f64, and `as u16` truncates.
-        let product = Product::from(offer(vec![item(None, 19.99, None)], None));
+    fn rounds_prices_that_float_math_lands_just_under() {
+        // $19.99 * 100.0 is 1998.9999999999998 in f64; truncating loses a cent.
+        let product = Product::from(offer(vec![item(Some(1.15), 19.99, None)], None));
 
-        assert_eq!(product.variants[0].sale_price, Some(1998));
+        assert_eq!(product.variants[0].sale_price, Some(1999));
+        assert_eq!(product.variants[0].list_price, Some(115));
     }
 
     #[test]
-    fn bug_saturates_prices_above_the_u16_ceiling() {
-        // u16 tops out at 65535 cents, i.e. $655.35. Float-to-int casts
-        // saturate rather than wrap, so anything dearer silently clamps.
+    fn keeps_prices_above_the_old_u16_ceiling() {
+        // 65535 cents is $655.35, which u16 used to clamp everything down to.
         let product = Product::from(offer(vec![item(Some(1234.56), 700.00, None)], None));
 
-        assert_eq!(product.variants[0].list_price, Some(65535));
-        assert_eq!(product.variants[0].sale_price, Some(65535));
+        assert_eq!(product.variants[0].list_price, Some(123456));
+        assert_eq!(product.variants[0].sale_price, Some(70000));
+    }
+
+    #[test]
+    fn rounds_a_half_cent_up() {
+        let product = Product::from(offer(vec![item(None, 0.125, None)], None));
+
+        assert_eq!(product.variants[0].sale_price, Some(13));
     }
 }
