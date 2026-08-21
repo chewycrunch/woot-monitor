@@ -30,6 +30,11 @@ const SEC_CH_UA_PLATFORM: &str = "\"Windows\"";
 /// Offers requested per page.
 const PAGE_SIZE: u16 = 200;
 
+/// Public URL of an offer's page on woot.com.
+pub fn offer_url(slug: &str) -> String {
+    format!("https://www.woot.com/offers/{}", slug)
+}
+
 // API Structure
 // This structure represents the response from Woot's API.
 // Each offer has multiple products (items), this can be different colors etc. They can each their own unique price and attributes.

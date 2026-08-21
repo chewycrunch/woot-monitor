@@ -3,15 +3,15 @@ use std::{sync::Arc, time::Duration};
 
 // Utils
 use tracing::{debug, error, info};
-use urlencoding::encode;
 
 // Project
+use super::notify;
 use super::product::{Product, Products};
 use super::scrape;
 use super::tls_api::TlsClient;
-use super::woot_api::WootApi;
+use super::woot_api::{self, WootApi};
 use crate::proxy::ProxyManager;
-use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
+use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 
 pub struct MonitorInstance {
     delay: Duration,
@@ -84,7 +84,7 @@ impl MonitorInstance {
                         }
 
                         if is_new && !product.out_of_stock {
-                            let url = format!("https://www.woot.com/offers/{}", product.slug);
+                            let url = woot_api::offer_url(&product.slug);
                             let (review_count, asin) = match self.fetch_offer_details(&url).await {
                                 Ok((reviews, asin_val)) => (reviews, asin_val),
                                 Err(e) => {
@@ -135,84 +135,17 @@ impl MonitorInstance {
         review_count: &Option<u32>,
         asin: &Option<String>,
     ) {
-        let embed = DiscordEmbed {
-            author: Some(crate::webhook::DiscordEmbedAuthor {
-                name: "Woot".to_string(),
-                url: Some("https://www.woot.com".to_string()),
-                icon_url: None, // Add an icon URL if needed
-            }),
-            thumbnail: product
-                .photos
-                .get(0)
-                .map(|p| crate::webhook::DiscordEmbedThumbnail { url: p.url.clone() }),
-
-            title: Some(product.title.clone()),
-            url: Some(format!("https://www.woot.com/offers/{}", product.slug)),
-            description: Some(format!(
-                "End Date: {}",
-                // product.sale_price.unwrap_or(0) as f32 / 100.0,
-                product.end_date.to_string()
-            )),
-
-            color: Some(0x00FF00),
-            fields: Some({
-                let mut fields: Vec<crate::webhook::DiscordEmbedField> = product
-                    .variants
-                    .iter()
-                    .map(|v| crate::webhook::DiscordEmbedField {
-                        name: v.attrs.clone().unwrap_or("Default Variant".into()),
-                        value: if v.list_price.unwrap_or(0) == 0 {
-                            format!("${:.2}", v.sale_price.unwrap_or(0) as f32 / 100.0)
-                        } else {
-                            format!(
-                                "~~${:.2}~~ ${:.2}",
-                                v.list_price.unwrap_or(0) as f32 / 100.0,
-                                v.sale_price.unwrap_or(0) as f32 / 100.0
-                            )
-                        },
-                        inline: Some(true),
-                    })
-                    .collect();
-
-                if let Some(count) = review_count {
-                    fields.push(crate::webhook::DiscordEmbedField {
-                        name: "Reviews".to_string(),
-                        value: count.to_string(),
-                        inline: Some(false),
-                    });
-                }
-                if let Some(asin_val) = asin {
-                    fields.push(crate::webhook::DiscordEmbedField {
-                        name: "Amazon".to_string(),
-                        value: format!("[{}](https://www.amazon.com/dp/{})", asin_val, asin_val),
-                        inline: Some(true),
-                    });
-                }
-
-                fields.push(crate::webhook::DiscordEmbedField {
-                        name: "Ebay".to_string(),
-                        value: format!(
-                            "[Search](https://www.ebay.com/sch/i.html?_nkw={}&rt=nc&LH_Sold=1&LH_Complete=1)",
-                        encode(&product.title)
-                        ),
-                        inline: Some(true),
-                    });
-                fields
-            }),
-            timestamp: Some(chrono::Utc::now().to_rfc3339()),
-            ..Default::default()
-        };
-
-        let payload = WebhookPayload::Discord(DiscordPayload {
-            embeds: Some(vec![embed]),
-            ..Default::default()
-        });
+        let payload = WebhookPayload::Discord(notify::offer_payload(
+            product,
+            *review_count,
+            asin.as_deref(),
+        ));
 
         self.webhook_manager
             .broadcast(
                 payload,
                 ItemInfo {
-                    total_reviews: review_count.clone(),
+                    total_reviews: *review_count,
                     asin: asin.clone(),
                     title: product.title.clone(),
                 },
