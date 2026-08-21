@@ -29,6 +29,12 @@ pub struct Products {
     offers: HashMap<String, Product>,
 }
 
+impl Default for Products {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Products {
     pub fn new() -> Self {
         Self {
