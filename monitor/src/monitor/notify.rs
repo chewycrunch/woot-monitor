@@ -9,7 +9,7 @@ use urlencoding::encode;
 
 use super::product::Product;
 use super::woot_api;
-use crate::webhook::{
+use crate::webhook::discord::{
     DiscordEmbed, DiscordEmbedAuthor, DiscordEmbedField, DiscordEmbedThumbnail, DiscordPayload,
 };
 

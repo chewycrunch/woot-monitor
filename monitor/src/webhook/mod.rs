@@ -1,12 +1,17 @@
+//! Webhook delivery.
+//!
+//! This module is deliberately provider-agnostic: it knows how to address and
+//! send a message, not what the message is about. Rendering a Woot offer into
+//! a payload lives on the monitor side, in `monitor::notify`.
+
 pub mod discord;
 pub mod manager;
 
-pub use manager::WebhookManager;
-pub use manager::ItemInfo;
+pub use manager::{ItemInfo, WebhookManager};
 
-use serde::Serialize;
+use discord::DiscordPayload;
 
-/// Generic webhook message. Extendable for other services.
+/// A message bound for one webhook provider. Extendable for other services.
 #[derive(Debug, Clone)]
 pub enum WebhookPayload {
     Discord(DiscordPayload),
@@ -14,74 +19,7 @@ pub enum WebhookPayload {
     // Telegram(TelegramPayload),
 }
 
-#[derive(Debug, Serialize, Clone, Default)]
-pub struct DiscordPayload {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub username: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub avatar_url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub embeds: Option<Vec<DiscordEmbed>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tts: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Clone, Default)]
-pub struct DiscordEmbed {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub color: Option<u32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fields: Option<Vec<DiscordEmbedField>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub author: Option<DiscordEmbedAuthor>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub thumbnail: Option<DiscordEmbedThumbnail>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub footer: Option<DiscordEmbedFooter>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<String>, // use ISO 8601 format
-}
-#[derive(Debug, Serialize, Clone)]
-pub struct DiscordEmbedAuthor {
-    pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon_url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DiscordEmbedThumbnail {
-    pub url: String,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DiscordEmbedField {
-    pub name: String,
-    pub value: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub inline: Option<bool>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DiscordEmbedFooter {
-    pub text: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon_url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct DiscordTimestamp(pub String); // ISO 8601 string
-
-/// Trait for any webhook sender
+/// Trait for any webhook sender.
 #[async_trait::async_trait]
 pub trait WebhookSender: Send + Sync {
     async fn send(&self, payload: WebhookPayload) -> Result<(), reqwest::Error>;
