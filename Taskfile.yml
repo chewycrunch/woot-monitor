@@ -1,12 +1,6 @@
 version: '3'
 
-# Personal settings live in .env — copy .env.example to .env and fill it in.
-dotenv: ['.env']
-
 vars:
-  REGION: '{{.REGION | default "us-east-1"}}'
-  REGISTRY: '{{.ACCOUNT}}.dkr.ecr.{{.REGION}}.amazonaws.com'
-
   # Local tls-client API. The version tracks the Dockerfile so there is only one
   # place to bump, and the binary is named after the release so a bump downloads
   # the new one instead of reusing a stale cache.
@@ -27,47 +21,39 @@ tasks:
     silent: true
 
   login:
-    desc: Authenticate Docker against ECR
-    requires:
-      vars: [ACCOUNT]
+    desc: Authenticate Docker against GHCR using the gh CLI's token
     cmds:
-      - aws ecr get-login-password --region {{.REGION}} --profile personal
-        | docker login --username AWS --password-stdin {{.REGISTRY}}
+      # Needs the write:packages scope once: gh auth refresh -s write:packages
+      - gh auth token | docker login ghcr.io --username $(gh api user --jq .login) --password-stdin
 
+  # bake reads the same compose.yml, but unlike `docker compose build/push` it
+  # understands the `platforms` key and pushes a real multi-arch manifest list.
+  # `docker compose push` would upload only one architecture.
   build:
-    desc: Build both images
+    desc: Build both images for every configured platform
     cmds:
-      - docker compose build
+      - docker buildx bake
 
   push:
-    desc: Push both images to ECR
-    requires:
-      vars: [ACCOUNT]
+    desc: Build and push both images to GHCR
     cmds:
-      - docker compose push
+      - docker buildx bake --push
 
   deploy:
-    desc: Log in, build and push both images
+    desc: Log in, then build and push both images to GHCR
     cmds:
       - task: login
-      - task: build
       - task: push
 
   monitor:
     desc: Build and push the monitor image
-    requires:
-      vars: [ACCOUNT]
     cmds:
-      - docker compose build monitor
-      - docker compose push monitor
+      - docker buildx bake monitor --push
 
   tls-client:
     desc: Build and push the tls-client image
-    requires:
-      vars: [ACCOUNT]
     cmds:
-      - docker compose build tls-client
-      - docker compose push tls-client
+      - docker buildx bake tls-client --push
 
   tls-client-local:
     desc: Run the tls-client API locally from an upstream release binary
