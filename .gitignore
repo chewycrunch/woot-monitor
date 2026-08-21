@@ -1,3 +1,4 @@
 monitor/proxies/proxies.txt
 Makefile.local
 .claude/
+.local/
