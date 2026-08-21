@@ -1,5 +1,10 @@
 // General
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    env,
+    sync::{Arc, LazyLock},
+    time::Duration,
+};
 
 // Reqwest
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
@@ -21,11 +26,18 @@ use crate::proxy::manager::ProxyManager;
 use crate::utils::{log, minify_graphql, LogLevel};
 use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
 
-const BASE_URL: &str = if cfg!(target_env = "msvc") || cfg!(windows) {
-    "http://127.0.0.1:8080"
-} else {
-    "http://tls-client:8080"
-};
+/// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.
+///
+/// The default suits both a bare `cargo run` against a tls-client container
+/// publishing 8080, and an ECS task where both containers share a network
+/// namespace. Under compose the services sit on their own network, so
+/// `compose.yml` sets this to `http://tls-client:8080`.
+static BASE_URL: LazyLock<String> = LazyLock::new(|| {
+    env::var("TLS_API_URL")
+        .ok()
+        .filter(|url| !url.is_empty())
+        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string())
+});
 
 pub struct MonitorInstance {
     delay: Duration,
@@ -300,7 +312,7 @@ impl MonitorInstance {
 
         let response = self
             .tls_client
-            .post(format!("{}/api/forward", BASE_URL))
+            .post(format!("{}/api/forward", *BASE_URL))
             .json(&payload)
             .send()
             .await?;
@@ -518,7 +530,7 @@ impl MonitorInstance {
         let client = reqwest::Client::new();
 
         client
-            .post(format!("{}/api/free-session", BASE_URL))
+            .post(format!("{}/api/free-session", *BASE_URL))
             .header("x-api-key", "yawn")
             .json(&json!({"sessionId": session_id}))
             .send()
