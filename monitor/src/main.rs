@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tracing::info;
 use woot_monitor::config::Config;
 use woot_monitor::logging;
-use woot_monitor::monitor::instance::MonitorInstance;
+use woot_monitor::monitor::Monitor;
 use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
 
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     webhook_manager.register_from_configs(config.webhooks);
     info!("Created webhook manager");
 
-    let mut monitor = MonitorInstance::new(webhook_manager, monitor_proxy_manager);
+    let mut monitor = Monitor::new(webhook_manager, monitor_proxy_manager);
     monitor.start().await;
 
     Ok(())

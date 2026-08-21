@@ -1,3 +1,10 @@
+pub mod notify;
+pub mod product;
+pub mod scrape;
+pub mod tls_api;
+pub mod transform;
+pub mod woot_api;
+
 // General
 use std::{sync::Arc, time::Duration};
 
@@ -5,15 +12,13 @@ use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, info};
 
 // Project
-use super::notify;
-use super::product::{Product, Products};
-use super::scrape;
-use super::tls_api::TlsClient;
-use super::woot_api::{self, WootApi};
+use self::product::{Product, Products};
+use self::tls_api::TlsClient;
+use self::woot_api::WootApi;
 use crate::proxy::ProxyManager;
 use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 
-pub struct MonitorInstance {
+pub struct Monitor {
     delay: Duration,
     products: Products,
     webhook_manager: WebhookManager,
@@ -22,7 +27,7 @@ pub struct MonitorInstance {
     tls_client: TlsClient,
 }
 
-impl MonitorInstance {
+impl Monitor {
     pub fn new(webhook_manager: WebhookManager, proxy_manager: Arc<ProxyManager>) -> Self {
         Self {
             delay: Duration::from_secs(5),
@@ -50,7 +55,7 @@ impl MonitorInstance {
 
         tokio::time::sleep(self.delay).await;
 
-        self.monitor().await;
+        self.run().await;
     }
 
     /// Intializes the monitor by loading in all products from Woot.
@@ -70,7 +75,7 @@ impl MonitorInstance {
     }
 
     /// Monitors Woot for new products.
-    pub async fn monitor(&mut self) {
+    pub async fn run(&mut self) {
         loop {
             match self.woot_api.fetch_all_offers().await {
                 Ok(products) => {
