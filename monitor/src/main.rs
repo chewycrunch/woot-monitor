@@ -2,9 +2,9 @@ use std::fs;
 use std::sync::Arc;
 use tracing::info;
 use woot_monitor::config::Config;
+use woot_monitor::logging;
 use woot_monitor::monitor::instance::MonitorInstance;
-use woot_monitor::proxy::manager::ProxyManager;
-use woot_monitor::utils::logger;
+use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
 
 fn load_config(path: &str) -> Config {
@@ -15,7 +15,7 @@ fn load_config(path: &str) -> Config {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
-    logger::init();
+    logging::init();
 
     info!(
         version = env!("CARGO_PKG_VERSION"),

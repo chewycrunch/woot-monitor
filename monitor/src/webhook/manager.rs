@@ -1,6 +1,6 @@
 use crate::{
     config::WebhookConfig,
-    proxy::manager::ProxyManager,
+    proxy::ProxyManager,
     webhook::{discord::DiscordWebhook, WebhookPayload},
 };
 use std::collections::HashSet;

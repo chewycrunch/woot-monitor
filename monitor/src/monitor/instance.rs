@@ -23,7 +23,7 @@ use super::tls_api::TlsApiResponse;
 
 use super::woot_api::{minify_graphql, WootResponse};
 use crate::monitor::WootData;
-use crate::proxy::manager::ProxyManager;
+use crate::proxy::ProxyManager;
 use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
 
 /// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.

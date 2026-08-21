@@ -1,4 +1,4 @@
-use crate::proxy::manager::ProxyManager;
+use crate::proxy::ProxyManager;
 use crate::webhook::{ WebhookPayload};
 use reqwest::Client;
 use serde_json::to_value;
