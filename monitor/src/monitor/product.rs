@@ -10,8 +10,8 @@ pub struct Product {
     pub out_of_stock: bool,
     pub title: String,
     pub end_date: DateTime<Utc>,
-    pub list_price: Option<u16>,
-    pub sale_price: Option<u16>,
+    pub list_price: Option<u32>,
+    pub sale_price: Option<u32>,
     pub condition: String,
     pub slug: String,
     pub photos: Vec<Photo>,
@@ -21,8 +21,8 @@ pub struct Product {
 #[derive(Clone)]
 pub struct Variant {
     pub attrs: Option<String>,
-    pub list_price: Option<u16>,
-    pub sale_price: Option<u16>,
+    pub list_price: Option<u32>,
+    pub sale_price: Option<u32>,
 }
 
 pub struct Products {
