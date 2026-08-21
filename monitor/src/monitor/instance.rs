@@ -2,12 +2,12 @@
 use std::{sync::Arc, time::Duration};
 
 // Utils
-use regex::Regex;
 use tracing::{debug, error, info};
 use urlencoding::encode;
 
 // Project
 use super::product::{Product, Products};
+use super::scrape;
 use super::tls_api::TlsClient;
 use super::woot_api::WootApi;
 use crate::proxy::ProxyManager;
@@ -117,41 +117,15 @@ impl MonitorInstance {
             .map(|p| p.to_proxy_url())
             .unwrap_or_default();
 
-        let body = self
+        let response = self
             .tls_client
             .forward(url, WootApi::page_headers(), proxy_url)
             .await?;
 
-        let total_reviews = Self::extract_total_reviews(&body);
-        let asin = Self::extract_asin(&body);
-
-        Ok((total_reviews, asin))
-    }
-
-    pub fn extract_total_reviews(html_content: &str) -> Option<u32> {
-        if let Ok(regex) = Regex::new(r#"\\?"TotalReviewCount\\?"\s*:\s*(\d+)"#) {
-            if let Some(captures) = regex.captures(html_content) {
-                if let Some(matched) = captures.get(1) {
-                    if let Ok(count) = matched.as_str().parse::<u32>() {
-                        return Some(count);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    pub fn extract_asin(html_content: &str) -> Option<String> {
-        if let Ok(regex) = Regex::new(
-            r#"(?s)RatingSummaryData\s*=\s*\[.*?\\?"Asin\\?"\s*:\s*\\?"([A-Z0-9]{10})\\?""#,
-        ) {
-            if let Some(captures) = regex.captures(html_content) {
-                if let Some(matched) = captures.get(1) {
-                    return Some(matched.as_str().to_string());
-                }
-            }
-        }
-        None
+        Ok((
+            scrape::total_reviews(&response.body),
+            scrape::asin(&response.body),
+        ))
     }
 
     /// Sends a webhook notification for a new offer.
