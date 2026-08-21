@@ -28,3 +28,23 @@ List values such as `api_auth_keys` do *not* override cleanly this way (setting
 
 The auth key in `config.yml` must match the `x-api-key` the monitor sends
 (see `monitor/src/monitor/instance.rs`).
+
+### dev vs prod
+
+`config.yml` is the config that is baked into the image and deployed. `config.dev.yml`
+is an *overlay* on it, not a second copy: `make tls-client-local` links `config.yml` in
+as the base and passes the overlay with `--config`, which gosoline merges over it. Only
+the handful of keys that differ live in the overlay, so there is nothing to keep in
+sync and local runs exercise the same ports and auth keys that ship.
+
+Only settings that genuinely cannot be carried by an env var need to be in the overlay.
+The log level is one: `LOG_HANDLERS_MAIN_LEVEL` has no effect, unlike scalars such as
+`API_PORT`.
+
+### Running the binary by hand
+
+Upstream's docs say to "modify the `config.dist.yml` file next to the binary", which
+holds as long as you run the binary from its own directory — the file is actually
+resolved against the *working directory*, and startup fails outright without it.
+`--config other.yml` does not lift that requirement: it selects an additional file to
+merge on top, but `./config.dist.yml` must still exist.

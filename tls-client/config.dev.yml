@@ -1,0 +1,14 @@
+# Dev overlay for config.yml — layered on top of it, not a replacement. Everything
+# not listed here (ports, auth keys, timeouts) comes from config.yml.
+# `make tls-client-local` links config.yml in as the base and passes this file with
+# --config.
+
+env: dev
+
+log:
+  handlers:
+    main:
+      level: debug
+
+api:
+  mode: debug
