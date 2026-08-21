@@ -79,3 +79,18 @@ pub struct Photo {
     #[serde(rename = "Url")]
     pub url: String,
 }
+
+/// Collapses a multi-line GraphQL query into a single line.
+///
+/// The queries are written as indented raw strings for readability, but they
+/// travel to Woot as a URL query parameter, so the whitespace is only overhead.
+/// Comment lines are dropped rather than joined, since a `#` comment would
+/// otherwise swallow the rest of the flattened query.
+pub fn minify_graphql(query: &str) -> String {
+    query
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.starts_with('#') && !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
