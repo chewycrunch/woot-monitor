@@ -53,7 +53,7 @@ impl From<WootOffer> for Product {
             .collect();
 
         let condition = items
-            .get(0)
+            .first()
             .and_then(|item| {
                 item.attributes.as_ref().and_then(|attrs| {
                     attrs
@@ -64,7 +64,7 @@ impl From<WootOffer> for Product {
             })
             .unwrap_or_else(|| "Unknown".to_string());
 
-        let (list_price, sale_price) = items.get(0).map_or((None, None), |item| {
+        let (list_price, sale_price) = items.first().map_or((None, None), |item| {
             (
                 item.list_price.map(to_cents),
                 Some(to_cents(item.sale_price)),

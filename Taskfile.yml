@@ -20,6 +20,14 @@ tasks:
       - task --list
     silent: true
 
+  hooks:
+    desc: Install the git hooks in .githooks (run once per clone)
+    cmds:
+      # Tracked in the repo, unlike .git/hooks, so the hook travels with a clone
+      # and shows up in review like any other file.
+      - git config core.hooksPath .githooks
+      - echo "hooks installed - pre-commit runs fmt and clippy"
+
   login:
     desc: Authenticate Docker against GHCR using the gh CLI's token
     cmds:
