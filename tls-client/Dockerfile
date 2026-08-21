@@ -4,7 +4,7 @@ ARG TLS_CLIENT_API_VERSION=v1.15.1
 
 # Runs on the host's own architecture and cross-compiles to the target, so a
 # multi-arch build costs one native Go build per arch rather than an emulated one.
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-bookworm AS builder
 
 ARG TLS_CLIENT_API_VERSION
 ARG TARGETOS
