@@ -1,4 +1,5 @@
 pub mod instance;
+pub mod notify;
 pub mod product;
 pub mod scrape;
 pub mod transform;
