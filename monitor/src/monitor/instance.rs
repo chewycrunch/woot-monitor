@@ -13,6 +13,7 @@ use reqwest::{Client, ClientBuilder};
 // Utils
 use regex::Regex;
 use serde_json::json;
+use tracing::{debug, error, info};
 use urlencoding::encode;
 
 // Project
@@ -23,7 +24,7 @@ use super::tls_api::TlsApiResponse;
 use super::woot_api::WootResponse;
 use crate::monitor::WootData;
 use crate::proxy::manager::ProxyManager;
-use crate::utils::{log, minify_graphql, LogLevel};
+use crate::utils::minify_graphql;
 use crate::webhook::{DiscordEmbed, DiscordPayload, ItemInfo, WebhookManager, WebhookPayload};
 
 /// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.
@@ -71,18 +72,12 @@ impl MonitorInstance {
     /// Starts the Woot Monitor instance.
     /// This function initializes the monitor, then begins monitoring for new products.
     pub async fn start(&mut self) {
-        log(
-            LogLevel::Info,
-            format!("Starting monitor | Delay {} ms", self.delay.as_millis()),
-        );
+        info!(delay_ms = self.delay.as_millis() as u64, "Starting monitor");
 
         match self.initialize().await {
             Ok(count) => count,
             Err(e) => {
-                log(
-                    LogLevel::Error,
-                    format!("Error during initialization: {}", e),
-                );
+                error!(error = %e, "Error during initialization");
 
                 return;
             }
@@ -95,10 +90,7 @@ impl MonitorInstance {
 
     /// Intializes the monitor by loading in all products from Woot.
     pub async fn initialize(&mut self) -> Result<u32, Box<dyn std::error::Error>> {
-        log(
-            LogLevel::Info,
-            "Initializing Monitor | Adding initial offers...",
-        );
+        info!("Initializing Monitor | Adding initial offers...");
 
         let all_products = self.fetch_all_offers().await?;
         let all_products_len = all_products.len();
@@ -107,10 +99,7 @@ impl MonitorInstance {
             self.products.add_offer(product);
         }
 
-        log(
-            LogLevel::Info,
-            &format!("Added {} Offers", all_products_len),
-        );
+        info!(count = all_products_len, "Added offers");
 
         Ok(self.products.get_count() as u32)
     }
@@ -120,19 +109,13 @@ impl MonitorInstance {
         loop {
             match self.fetch_all_offers().await {
                 Ok(products) => {
-                    log(
-                        LogLevel::Info,
-                        &format!("Fetched {} offers", products.len(),),
-                    );
+                    info!(count = products.len(), "Fetched offers");
 
                     for product in products {
                         let is_new = self.products.add_offer(product.clone());
 
                         if is_new {
-                            log(
-                                LogLevel::New,
-                                format!("New Offer Detected: {}", product.id,),
-                            );
+                            info!(target: "offers", id = %product.id, "New offer detected");
                         }
 
                         if is_new && !product.out_of_stock {
@@ -140,24 +123,18 @@ impl MonitorInstance {
                             let (review_count, asin) = match self.fetch_offer_details(&url).await {
                                 Ok((reviews, asin_val)) => (reviews, asin_val),
                                 Err(e) => {
-                                    log(
-                                        LogLevel::Error,
-                                        format!("Error fetching offer details: {}", e),
-                                    );
+                                    error!(error = %e, "Error fetching offer details");
                                     (None, None)
                                 }
                             };
 
-                            log(
-                                LogLevel::Debug,
-                                format!("review_count = {:?}, asin = {:?}", review_count, asin),
-                            );
+                            debug!(?review_count, ?asin, "Fetched offer details");
 
                             self.new_offer_webhook(&product, &review_count, &asin).await;
                         }
                     }
                 }
-                Err(e) => log(LogLevel::Error, format!("Error fetching offers: {}", e)),
+                Err(e) => error!(error = %e, "Error fetching offers"),
             }
 
             tokio::time::sleep(self.delay).await;
@@ -199,14 +176,7 @@ impl MonitorInstance {
             skip += 1
         }
 
-        log(
-            LogLevel::Info,
-            &format!(
-                "Fetched all offers with {} requests using {} limit",
-                skip + 1,
-                limit
-            ),
-        );
+        info!(requests = skip + 1, limit, "Fetched all offers");
 
         Ok(all_products)
     }

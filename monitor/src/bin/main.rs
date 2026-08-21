@@ -1,9 +1,10 @@
 use std::fs;
 use std::sync::Arc;
+use tracing::info;
 use woot_monitor::config::Config;
 use woot_monitor::monitor::instance::MonitorInstance;
 use woot_monitor::proxy::manager::ProxyManager;
-use woot_monitor::utils::{log, LogLevel};
+use woot_monitor::utils::logger;
 use woot_monitor::webhook::WebhookManager;
 
 fn load_config(path: &str) -> Config {
@@ -14,43 +15,36 @@ fn load_config(path: &str) -> Config {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
-    log(
-        LogLevel::Info,
-        format!("Welcome to Woot Monitor {}", env!("CARGO_PKG_VERSION")),
+    logger::init();
+
+    info!(
+        version = env!("CARGO_PKG_VERSION"),
+        "Welcome to Woot Monitor"
     );
 
     let config = load_config("config.yaml");
-    log(
-        LogLevel::Info,
-        format!("Loaded config: {:?} senders", config.webhooks.len()),
-    );
+    info!(senders = config.webhooks.len(), "Loaded config");
 
     let webhook_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies/proxies.txt"));
     let monitor_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies/proxies.txt"));
-    log(
-        LogLevel::Info,
-        format!(
-            "Loaded {} proxies from {} for webhooks",
-            webhook_proxy_manager.count(),
-            webhook_proxy_manager
-                .filename()
-                .unwrap_or("unknown".to_string())
-        ),
+    info!(
+        count = webhook_proxy_manager.count(),
+        file = webhook_proxy_manager
+            .filename()
+            .unwrap_or("unknown".to_string()),
+        "Loaded proxies for webhooks"
     );
-    log(
-        LogLevel::Info,
-        format!(
-            "Loaded {} proxies from {} for monitor",
-            monitor_proxy_manager.count(),
-            monitor_proxy_manager
-                .filename()
-                .unwrap_or("unknown".to_string())
-        ),
+    info!(
+        count = monitor_proxy_manager.count(),
+        file = monitor_proxy_manager
+            .filename()
+            .unwrap_or("unknown".to_string()),
+        "Loaded proxies for monitor"
     );
 
     let mut webhook_manager = WebhookManager::new(webhook_proxy_manager);
     webhook_manager.register_from_configs(config.webhooks);
-    log(LogLevel::Info, "Created webhook manager");
+    info!("Created webhook manager");
 
     let mut monitor = MonitorInstance::new(webhook_manager, monitor_proxy_manager);
     monitor.start().await;
