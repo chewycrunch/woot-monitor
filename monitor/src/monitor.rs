@@ -15,6 +15,8 @@ use tracing::{debug, error, info};
 use self::product::{Product, Products};
 use self::tls_api::TlsClient;
 use self::woot_api::WootApi;
+use chrono::{DateTime, Utc};
+
 use crate::config::Config;
 use crate::proxy::ProxyManager;
 use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
@@ -33,6 +35,8 @@ pub struct Monitor {
     proxy_manager: Arc<ProxyManager>,
     woot_api: WootApi,
     tls_client: TlsClient,
+    /// Newest StartDate already seen, the point each poll pages back from.
+    newest_start_date: Option<DateTime<Utc>>,
 }
 
 /// Doubles the wait, stopping at [`INIT_RETRY_MAX`].
@@ -53,6 +57,7 @@ impl Monitor {
             woot_api: WootApi::new(Arc::clone(&proxy_manager), config.graphql_api_key.clone()),
             proxy_manager,
             tls_client: TlsClient::new(config.tls_api_url.clone(), &config.tls_api_key),
+            newest_start_date: None,
         }
     }
 
@@ -93,6 +98,7 @@ impl Monitor {
         let all_products_len = all_products.len();
 
         for product in all_products {
+            self.advance_newest(&product);
             self.products.add_offer(product);
         }
 
@@ -101,14 +107,32 @@ impl Monitor {
         Ok(self.products.get_count() as u32)
     }
 
+    /// Tracks the newest StartDate seen, which bounds how deep a poll pages.
+    fn advance_newest(&mut self, product: &Product) {
+        if self
+            .newest_start_date
+            .is_none_or(|newest| product.start_date > newest)
+        {
+            self.newest_start_date = Some(product.start_date);
+        }
+    }
+
     /// Monitors Woot for new products.
     pub async fn run(&mut self) {
         loop {
-            match self.woot_api.fetch_all_offers().await {
+            // Before the first sweep completes there is no cutoff to page back
+            // from, so fall back to reading everything.
+            let fetched = match self.newest_start_date {
+                Some(since) => self.woot_api.fetch_offers_since(since).await,
+                None => self.woot_api.fetch_all_offers().await,
+            };
+
+            match fetched {
                 Ok(products) => {
                     info!(count = products.len(), "Fetched offers");
 
                     for product in products {
+                        self.advance_newest(&product);
                         let is_new = self.products.add_offer(product.clone());
 
                         if is_new {

@@ -9,6 +9,7 @@ pub struct Product {
     pub id: String,
     pub out_of_stock: bool,
     pub title: String,
+    pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub list_price: Option<u32>,
     pub sale_price: Option<u32>,
