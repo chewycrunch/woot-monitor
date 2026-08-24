@@ -18,6 +18,15 @@ use self::woot_api::WootApi;
 use crate::proxy::ProxyManager;
 use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 
+/// First wait after a failed initialization, doubled on each further failure.
+const INIT_RETRY_INITIAL: Duration = Duration::from_secs(5);
+
+/// Ceiling on the retry wait. Initialization failures are usually either
+/// transient (a proxy or a timeout, cleared by the next attempt) or structural
+/// (an expired API key, cleared only by a deploy), and backing off past a minute
+/// would delay recovery from the first without meaningfully helping the second.
+const INIT_RETRY_MAX: Duration = Duration::from_secs(60);
+
 pub struct Monitor {
     delay: Duration,
     products: Products,
@@ -25,6 +34,11 @@ pub struct Monitor {
     proxy_manager: Arc<ProxyManager>,
     woot_api: WootApi,
     tls_client: TlsClient,
+}
+
+/// Doubles the wait, stopping at [`INIT_RETRY_MAX`].
+fn next_backoff(current: Duration) -> Duration {
+    (current * 2).min(INIT_RETRY_MAX)
 }
 
 impl Monitor {
@@ -44,14 +58,25 @@ impl Monitor {
     pub async fn start(&mut self) {
         info!(delay_ms = self.delay.as_millis() as u64, "Starting monitor");
 
-        match self.initialize().await {
-            Ok(count) => count,
-            Err(e) => {
-                error!(error = %e, "Error during initialization");
+        // `run` already tolerates a failed fetch and carries on, so treating the
+        // identical failure as fatal here only converted a recoverable blip into
+        // a process exit — and, under a restart policy, a silent restart loop.
+        let mut backoff = INIT_RETRY_INITIAL;
+        let mut attempt: u32 = 1;
 
-                return;
-            }
-        };
+        while let Err(e) = self.initialize().await {
+            error!(
+                error = %e,
+                attempt,
+                retry_in_ms = backoff.as_millis() as u64,
+                "Error during initialization, retrying"
+            );
+
+            tokio::time::sleep(backoff).await;
+
+            backoff = next_backoff(backoff);
+            attempt += 1;
+        }
 
         tokio::time::sleep(self.delay).await;
 
@@ -156,5 +181,39 @@ impl Monitor {
                 },
             )
             .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn doubles_the_wait_on_each_failure() {
+        assert_eq!(
+            next_backoff(Duration::from_secs(5)),
+            Duration::from_secs(10)
+        );
+        assert_eq!(
+            next_backoff(Duration::from_secs(10)),
+            Duration::from_secs(20)
+        );
+    }
+
+    #[test]
+    fn never_waits_longer_than_the_ceiling() {
+        assert_eq!(next_backoff(Duration::from_secs(40)), INIT_RETRY_MAX);
+        assert_eq!(next_backoff(INIT_RETRY_MAX), INIT_RETRY_MAX);
+    }
+
+    /// A structural failure retries indefinitely, so the wait has to converge
+    /// rather than grow without bound.
+    #[test]
+    fn converges_on_the_ceiling_from_the_initial_wait() {
+        let mut backoff = INIT_RETRY_INITIAL;
+        for _ in 0..64 {
+            backoff = next_backoff(backoff);
+        }
+        assert_eq!(backoff, INIT_RETRY_MAX);
     }
 }
