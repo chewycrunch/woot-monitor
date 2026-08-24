@@ -10,12 +10,24 @@ fn default_graphql_api_key() -> String {
     DEFAULT_GRAPHQL_API_KEY.to_string()
 }
 
+/// Woot lists offers far slower than this, so the interval is about how quickly
+/// a new one is noticed, traded against request volume.
+const DEFAULT_DELAY_MS: u64 = 5_000;
+
+fn default_delay_ms() -> u64 {
+    DEFAULT_DELAY_MS
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     /// Woot's public AppSync key, normally supplied by WOOT_GRAPHQL_API_KEY.
     /// Defaulted, so config.toml carries webhooks only.
     #[serde(default = "default_graphql_api_key")]
     pub graphql_api_key: String,
+
+    /// Wait between polls, normally supplied by WOOT_DELAY_MS.
+    #[serde(default = "default_delay_ms")]
+    pub delay_ms: u64,
 
     pub webhooks: Vec<WebhookConfig>,
 }
@@ -60,6 +72,7 @@ mod tests {
             .expect("config.example.toml is invalid");
 
         assert_eq!(config.graphql_api_key, DEFAULT_GRAPHQL_API_KEY);
+        assert_eq!(config.delay_ms, DEFAULT_DELAY_MS);
         assert!(!config.webhooks.is_empty());
         assert!(config
             .webhooks
@@ -85,5 +98,26 @@ mod tests {
         std::env::remove_var("WOOT_GRAPHQL_API_KEY");
 
         assert_eq!(config.graphql_api_key, "da2-fromenv");
+    }
+
+    /// The delay drives request volume: ~50 paged requests per poll makes the
+    /// interval the main lever on how hard the proxies are worked.
+    #[test]
+    fn an_env_var_overrides_the_delay() {
+        std::env::set_var("WOOT_DELAY_MS", "30000");
+
+        let config: Config = config::Config::builder()
+            .add_source(File::from_str(
+                include_str!("../config.example.toml"),
+                FileFormat::Toml,
+            ))
+            .add_source(Environment::with_prefix(ENV_PREFIX))
+            .build()
+            .and_then(config::Config::try_deserialize)
+            .expect("config with env override is invalid");
+
+        std::env::remove_var("WOOT_DELAY_MS");
+
+        assert_eq!(config.delay_ms, 30_000);
     }
 }
