@@ -18,11 +18,6 @@ use serde_json::json;
 const API_KEY: &str = "yawn";
 
 /// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.
-///
-/// The default suits both a bare `cargo run` against a tls-client container
-/// publishing 8080, and an ECS task where both containers share a network
-/// namespace. Deployments that put the two on separate networks set this to
-/// the sidecar's hostname, e.g. `http://tls-client:8080`.
 static BASE_URL: LazyLock<String> = LazyLock::new(|| {
     env::var("TLS_API_URL")
         .ok()

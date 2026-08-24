@@ -1,15 +1,8 @@
 use super::product::{Product, Variant};
 use super::woot_api::WootOffer;
 
-/// Converts a price in dollars to whole cents.
-///
-/// Rounds rather than truncates: `f64` cannot represent most two-decimal
-/// prices exactly, and `19.99 * 100.0` is `1998.999...`, which a plain cast
-/// would turn into 1998 cents.
-///
-/// The result is `u32` rather than `u16` because 65535 cents is only $655.35,
-/// and float-to-int casts saturate silently rather than wrapping — a dearer
-/// item would have clamped to that ceiling instead of failing visibly.
+/// Converts a price in dollars to whole cents, rounding because `19.99 * 100.0`
+/// is `1998.999...`. `u32` rather than `u16`: 65535 cents is only $655.35.
 fn to_cents(dollars: f64) -> u32 {
     (dollars * 100.0).round() as u32
 }

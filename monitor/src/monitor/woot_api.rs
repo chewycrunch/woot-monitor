@@ -17,14 +17,9 @@ use crate::proxy::ProxyManager;
 /// GraphQL endpoint backing woot.com's own search.
 const GRAPHQL_URL: &str = "https://d24qg5zsx8xdc4.cloudfront.net/graphql";
 
-/// Public API key woot.com ships to its own front end.
-///
-/// This is an AppSync API key, which AWS caps at a 365-day lifetime, so it goes
-/// stale on its own schedule regardless of anything on our side. An expired key
-/// surfaces as `UnauthorizedException` with "You are not authorized to make this
-/// call." — as distinct from "Valid authorization header not provided.", which
-/// means the header never went out. Refresh it by grepping woot.com's HTML for
-/// the current `da2-` value.
+/// Public API key woot.com ships to its own front end. AppSync caps these at a
+/// year, so it expires on its own; "You are not authorized to make this call."
+/// means it is stale. Refresh by grepping woot.com's HTML for the `da2-` value.
 const GRAPHQL_API_KEY: &str = "da2-gdf6f2cxpnb3xikqgzzhfhovem";
 
 /// Browser identity presented to Woot. The three values travel together — a
@@ -37,10 +32,8 @@ const SEC_CH_UA_PLATFORM: &str = "\"Windows\"";
 /// Offers requested per page.
 const PAGE_SIZE: u16 = 200;
 
-/// Woot rejects any search whose `Skip + Limit` exceeds this, with
-/// "Search request depth cannot exceed 10000". It is a hard ceiling on how far
-/// into the catalogue paging can reach, independent of how many offers match,
-/// so once the catalogue outgrows it some offers are simply unreachable.
+/// Woot's GraphQL API rejects any search whose `Skip + Limit` exceeds this, so
+/// the catalog is only reachable this deep however many offers match.
 const MAX_SEARCH_DEPTH: u16 = 10_000;
 
 /// Public URL of an offer's page on woot.com.
@@ -127,12 +120,8 @@ pub struct Photo {
     pub url: String,
 }
 
-/// Collapses a multi-line GraphQL query into a single line.
-///
-/// The queries are written as indented raw strings for readability, but they
-/// travel to Woot as a URL query parameter, so the whitespace is only overhead.
-/// Comment lines are dropped rather than joined, since a `#` comment would
-/// otherwise swallow the rest of the flattened query.
+/// Collapses a multi-line GraphQL query into a single line for the URL. Comment
+/// lines are dropped, not joined: a `#` would swallow the rest of the query.
 pub fn minify_graphql(query: &str) -> String {
     query
         .lines()
@@ -181,9 +170,8 @@ impl WootApi {
                 break;
             }
 
-            // Asking for a page past the ceiling fails the whole request rather
-            // than returning a short page, so stop before that instead of
-            // turning a full catalogue into an error.
+            // Past the ceiling the whole request fails rather than returning a
+            // short page, so stop first.
             if Self::next_page_depth(skip) > MAX_SEARCH_DEPTH {
                 warn!(
                     fetched = all_products.len(),
@@ -202,9 +190,7 @@ impl WootApi {
         Ok(all_products)
     }
 
-    /// Depth the page after `skip` would request. Woot measures depth as
-    /// `Skip + Limit`, so the deepest page it serves starts at
-    /// `MAX_SEARCH_DEPTH - PAGE_SIZE`.
+    /// Depth the page after `skip` would request, measured as `Skip + Limit`.
     fn next_page_depth(skip: u8) -> u16 {
         (u16::from(skip) + 1) * PAGE_SIZE + PAGE_SIZE
     }
@@ -365,8 +351,7 @@ impl WootApi {
 mod tests {
     use super::*;
 
-    /// Woot serves `Skip + Limit == MAX_SEARCH_DEPTH` but rejects anything past
-    /// it, so the guard has to stop one page later than a naive `>=` would.
+    /// The limit is inclusive, so a naive `>=` would drop the last valid page.
     #[test]
     fn allows_the_page_that_lands_exactly_on_the_depth_limit() {
         assert_eq!(WootApi::next_page_depth(48), MAX_SEARCH_DEPTH);
@@ -378,8 +363,7 @@ mod tests {
         assert!(WootApi::next_page_depth(49) > MAX_SEARCH_DEPTH);
     }
 
-    /// The deepest page actually requested starts at `MAX_SEARCH_DEPTH -
-    /// PAGE_SIZE`, so paging reaches exactly `MAX_SEARCH_DEPTH` offers.
+    /// Paging should reach exactly `MAX_SEARCH_DEPTH` offers.
     #[test]
     fn reaches_the_depth_limit_exactly() {
         let last_page = (0u8..)

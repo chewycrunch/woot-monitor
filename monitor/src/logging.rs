@@ -10,14 +10,8 @@ const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 const DEFAULT_FILTER: &str = "woot_monitor=info,offers=info";
 
 /// Installs the global tracing subscriber. Call once, at the top of `main`.
-///
-/// Filtering is controlled by `RUST_LOG`, e.g.
-/// `RUST_LOG=woot_monitor=debug,offers=info,reqwest=warn`. New-offer events are
-/// emitted under the `offers` target so they can be filtered independently of
-/// the monitor's own chatter.
-///
-/// Set `LOG_FORMAT=json` to emit one structured JSON object per event instead
-/// of the human-readable format.
+/// `RUST_LOG` filters; new-offer events use the `offers` target so they can be
+/// filtered on their own. `LOG_FORMAT=json` switches to structured output.
 pub fn init() {
     let filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(DEFAULT_FILTER));
