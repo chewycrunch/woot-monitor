@@ -36,7 +36,7 @@ tasks:
 
   # Targets and tags live in docker-bake.hcl. bake is what makes the multi-arch
   # build work: `docker compose push` would upload only one architecture.
-  # Override the tag with e.g. `TAG=v1.3.17 task push`.
+  # Override the tag with e.g. `TAG=v1.4.0 task push`.
   build:
     desc: Build both images for every configured platform
     cmds:
