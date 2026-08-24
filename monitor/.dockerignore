@@ -2,3 +2,9 @@ target/
 .git/
 *.rs.bk
 *.log
+
+# Real webhook URLs and proxies. Never bake these into a published image — they
+# are bind-mounted at run time. Without these lines a local build silently ships
+# whatever the developer happens to have on disk.
+config.yaml
+proxies/proxies.txt

@@ -8,8 +8,13 @@ use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
 
 fn load_config(path: &str) -> Config {
-    let contents = fs::read_to_string(path).expect("Failed to read config file");
-    serde_yaml::from_str(&contents).expect("Invalid YAML config")
+    // Named in both messages because the path is relative to the working
+    // directory: in a container that is /app, and a missing bind mount is the
+    // usual cause. See config.example.yaml for the expected shape.
+    let contents = fs::read_to_string(path)
+        .unwrap_or_else(|e| panic!("Failed to read config file {path}: {e}"));
+    serde_yaml::from_str(&contents)
+        .unwrap_or_else(|e| panic!("Invalid YAML in config file {path}: {e}"))
 }
 
 #[tokio::main]
