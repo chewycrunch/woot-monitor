@@ -21,9 +21,7 @@ pub struct WebhookConfig {
 mod tests {
     use super::*;
 
-    /// The example is the only committed copy of the config shape, so a schema
-    /// change that forgets it would otherwise surface as a startup panic on a
-    /// fresh checkout rather than a failing test.
+    /// The example is the only committed copy of the config shape.
     #[test]
     fn the_shipped_example_parses() {
         let contents = include_str!("../config.example.yaml");

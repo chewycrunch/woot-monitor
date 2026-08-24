@@ -10,12 +10,8 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    /// Renders the proxy as a URL for the tls-client sidecar's `proxyUrl` field.
-    ///
-    /// Credentials go between the scheme and the host, so the scheme is written
-    /// exactly once — building the bare `http://host:port` first and prefixing
-    /// the userinfo onto it yields `http://user:pass@http://host:port`, which no
-    /// client can parse.
+    /// Renders the proxy as a URL for the sidecar's `proxyUrl` field, with the
+    /// credentials between the scheme and the host so the scheme appears once.
     pub fn to_proxy_url(&self) -> String {
         match (&self.user, &self.pass) {
             (Some(user), Some(pass)) => {
@@ -125,8 +121,7 @@ mod tests {
         assert_eq!(proxy(None, None).to_proxy_url(), "http://45.3.38.37:3129");
     }
 
-    /// The scheme is the part that used to be duplicated, and the sidecar takes
-    /// the string verbatim, so a second occurrence would go out unnoticed.
+    /// The sidecar takes the string verbatim, so a duplicate scheme is silent.
     #[test]
     fn writes_the_scheme_exactly_once() {
         assert_eq!(

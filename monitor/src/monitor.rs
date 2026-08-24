@@ -21,10 +21,8 @@ use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 /// First wait after a failed initialization, doubled on each further failure.
 const INIT_RETRY_INITIAL: Duration = Duration::from_secs(5);
 
-/// Ceiling on the retry wait. Initialization failures are usually either
-/// transient (a proxy or a timeout, cleared by the next attempt) or structural
-/// (an expired API key, cleared only by a deploy), and backing off past a minute
-/// would delay recovery from the first without meaningfully helping the second.
+/// Ceiling on the retry wait. Longer would delay recovery from a transient
+/// failure without helping a structural one, which needs a deploy regardless.
 const INIT_RETRY_MAX: Duration = Duration::from_secs(60);
 
 pub struct Monitor {
@@ -58,9 +56,8 @@ impl Monitor {
     pub async fn start(&mut self) {
         info!(delay_ms = self.delay.as_millis() as u64, "Starting monitor");
 
-        // `run` already tolerates a failed fetch and carries on, so treating the
-        // identical failure as fatal here only converted a recoverable blip into
-        // a process exit — and, under a restart policy, a silent restart loop.
+        // `run` already carries on after a failed fetch; exiting here turned the
+        // same blip into a restart loop.
         let mut backoff = INIT_RETRY_INITIAL;
         let mut attempt: u32 = 1;
 
@@ -206,8 +203,7 @@ mod tests {
         assert_eq!(next_backoff(INIT_RETRY_MAX), INIT_RETRY_MAX);
     }
 
-    /// A structural failure retries indefinitely, so the wait has to converge
-    /// rather than grow without bound.
+    /// Retries are unbounded, so the wait must converge.
     #[test]
     fn converges_on_the_ceiling_from_the_initial_wait() {
         let mut backoff = INIT_RETRY_INITIAL;
