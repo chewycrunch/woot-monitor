@@ -24,9 +24,8 @@ mod tests {
     /// The example is the only committed copy of the config shape.
     #[test]
     fn the_shipped_example_parses() {
-        let contents = include_str!("../config.example.yaml");
-        let config: Config =
-            serde_yaml::from_str(contents).expect("config.example.yaml is invalid");
+        let contents = include_str!("../config.example.toml");
+        let config: Config = toml::from_str(contents).expect("config.example.toml is invalid");
 
         assert!(!config.webhooks.is_empty());
         assert!(config
