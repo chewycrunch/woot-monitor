@@ -5,25 +5,19 @@
 //! [tls-client]: https://github.com/bogdanfinn/tls-client-api
 
 use std::collections::HashMap;
-use std::env;
-use std::sync::LazyLock;
 use std::time::Duration;
 
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::Deserialize;
 use serde_json::json;
 
-/// Auth key expected by the sidecar. Must match `api_auth_keys` in
-/// `tls-client/config.yml`.
-const API_KEY: &str = "yawn";
+/// Auth key expected by the sidecar. Overridden together with the sidecar's own
+/// `API_AUTH_KEYS`, which replaces the key baked into its image.
+pub const DEFAULT_TLS_API_KEY: &str = "yawn";
 
-/// Base URL of the tls-client API, overridable with the `TLS_API_URL` env var.
-static BASE_URL: LazyLock<String> = LazyLock::new(|| {
-    env::var("TLS_API_URL")
-        .ok()
-        .filter(|url| !url.is_empty())
-        .unwrap_or_else(|| "http://127.0.0.1:8080".to_string())
-});
+/// Suits a bare `cargo run` against a sidecar publishing 8080. Deployments put
+/// the two on one network and set the service name instead.
+pub const DEFAULT_TLS_API_URL: &str = "http://127.0.0.1:8080";
 
 /// Envelope the tls-client API wraps every forwarded response in. The upstream
 /// response body arrives as a JSON-escaped string in `body`.
@@ -42,12 +36,16 @@ pub struct TlsApiResponse {
 /// Handle on the tls-client sidecar.
 pub struct TlsClient {
     http: reqwest::Client,
+    base_url: String,
 }
 
 impl TlsClient {
-    pub fn new() -> Self {
+    pub fn new(base_url: String, api_key: &str) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert("x-api-key", HeaderValue::from_static(API_KEY));
+        headers.insert(
+            "x-api-key",
+            HeaderValue::from_str(api_key).expect("tls api key is not a valid header value"),
+        );
         headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         let http = reqwest::Client::builder()
@@ -56,7 +54,7 @@ impl TlsClient {
             .build()
             .expect("Failed to create TLS forwarding client");
 
-        Self { http }
+        Self { http, base_url }
     }
 
     /// Forwards a GET through the sidecar and returns the decoded envelope.
@@ -80,7 +78,7 @@ impl TlsClient {
 
         let response = self
             .http
-            .post(format!("{}/api/forward", *BASE_URL))
+            .post(format!("{}/api/forward", self.base_url))
             .json(&payload)
             .send()
             .await?;
@@ -96,17 +94,11 @@ impl TlsClient {
     /// Releases a session so the sidecar does not accumulate them.
     async fn free_session(&self, session_id: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.http
-            .post(format!("{}/api/free-session", *BASE_URL))
+            .post(format!("{}/api/free-session", self.base_url))
             .json(&json!({ "sessionId": session_id }))
             .send()
             .await?;
 
         Ok(())
-    }
-}
-
-impl Default for TlsClient {
-    fn default() -> Self {
-        Self::new()
     }
 }

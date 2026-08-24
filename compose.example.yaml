@@ -9,6 +9,7 @@
 #     compose.yaml     <- this file
 #     config.toml      <- from monitor/config.example.toml, with your real URLs
 #     proxies.txt      <- ip:port or ip:port:user:pass, one per line
+#     .env             <- TLS_API_KEY=<anything>, read by compose below
 #
 # The monitor reads ./config.toml and ./proxies.txt relative to /app, and
 # neither is baked into the image, so both mounts are required. A missing
@@ -25,7 +26,10 @@ services:
     environment:
       # Both containers share this network, so the sidecar is reachable by
       # service name. The image default (127.0.0.1:8080) is wrong here.
-      TLS_API_URL: http://tls-client:8080
+      WOOT_TLS_API_URL: http://tls-client:8080
+      # Same value as the sidecar's API_AUTH_KEYS below — compose reads it from
+      # ./.env so the shared secret is defined once.
+      WOOT_TLS_API_KEY: ${TLS_API_KEY:?set TLS_API_KEY in .env}
       # Optional. Defaults to woot_monitor=info,offers=info.
       # RUST_LOG: woot_monitor=debug,offers=info,reqwest=warn
       # Optional. Set to json for one structured object per log line.
@@ -44,8 +48,12 @@ services:
   tls-client:
     image: ghcr.io/chewycrunch/woot-monitor/tls-client:latest
     restart: unless-stopped
-    # Nothing to configure: config.dist.yml is baked into this image, and the API
-    # is only reachable from the monitor on this network — no ports published.
+    environment:
+      # Replaces the key baked into the image rather than adding to it, so the
+      # built-in default stops working once this is set.
+      API_AUTH_KEYS: ${TLS_API_KEY:?set TLS_API_KEY in .env}
+    # Otherwise unconfigured: the rest of config.dist.yml is baked in, and the
+    # API is only reachable from the monitor — no ports published.
     ports: []
     networks:
       - internal

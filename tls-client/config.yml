@@ -30,6 +30,8 @@ api:
     write: 120s
     idle: 120s
 
+# Default only. The API_AUTH_KEYS env var replaces this list rather than adding
+# to it, so a deployment setting it retires this key entirely.
 api_auth_keys: ["yawn"]
 
 api_cors_allowed_origin_pattern: ""
