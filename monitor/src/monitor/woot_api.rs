@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info, warn};
 use urlencoding::encode;
 
 use super::product::Product;
@@ -36,6 +36,12 @@ const SEC_CH_UA_PLATFORM: &str = "\"Windows\"";
 
 /// Offers requested per page.
 const PAGE_SIZE: u16 = 200;
+
+/// Woot rejects any search whose `Skip + Limit` exceeds this, with
+/// "Search request depth cannot exceed 10000". It is a hard ceiling on how far
+/// into the catalogue paging can reach, independent of how many offers match,
+/// so once the catalogue outgrows it some offers are simply unreachable.
+const MAX_SEARCH_DEPTH: u16 = 10_000;
 
 /// Public URL of an offer's page on woot.com.
 pub fn offer_url(slug: &str) -> String {
@@ -67,8 +73,8 @@ pub struct WootData {
 pub struct SearchOffers {
     #[serde(rename = "Offers")]
     pub offers: Vec<WootOffer>,
-    // #[serde(rename = "TotalHits")]
-    // pub total_hits: u32,
+    #[serde(rename = "TotalHits")]
+    pub total_hits: u32,
 }
 
 #[derive(Deserialize, Debug)]
@@ -161,6 +167,7 @@ impl WootApi {
                 .search_offers
                 .ok_or("Missing `searchOffers` field in GraphQL response")?;
 
+            let total_hits = search_offers.total_hits;
             let offers = search_offers.offers;
             if offers.is_empty() {
                 break;
@@ -174,12 +181,32 @@ impl WootApi {
                 break;
             }
 
+            // Asking for a page past the ceiling fails the whole request rather
+            // than returning a short page, so stop before that instead of
+            // turning a full catalogue into an error.
+            if Self::next_page_depth(skip) > MAX_SEARCH_DEPTH {
+                warn!(
+                    fetched = all_products.len(),
+                    total = total_hits,
+                    depth = MAX_SEARCH_DEPTH,
+                    "Reached Woot's search depth limit; older offers beyond it are not visible"
+                );
+                break;
+            }
+
             skip += 1
         }
 
         info!(requests = skip + 1, limit = PAGE_SIZE, "Fetched all offers");
 
         Ok(all_products)
+    }
+
+    /// Depth the page after `skip` would request. Woot measures depth as
+    /// `Skip + Limit`, so the deepest page it serves starts at
+    /// `MAX_SEARCH_DEPTH - PAGE_SIZE`.
+    fn next_page_depth(skip: u8) -> u16 {
+        (u16::from(skip) + 1) * PAGE_SIZE + PAGE_SIZE
     }
 
     /// Fetches a single page of offers. `skip` is a page index, not an offset.
@@ -198,10 +225,11 @@ impl WootApi {
                             Categories: ["home", "tech", "pc", "tools", "sport", "grocery"],
                             IsSoldOut: {{ exclude: true }}
                         }},
-                        Sort: BestSelling,
+                        Sort: NewestFirst,
                         Limit: {},
                         Skip: {}
                     ) {{
+                        TotalHits
                         Offers {{
                             Id
                             SoldOut
@@ -330,5 +358,37 @@ impl WootApi {
         headers.insert("Accept-Language", "en-US,en;q=0.9".parse().unwrap());
 
         headers
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Woot serves `Skip + Limit == MAX_SEARCH_DEPTH` but rejects anything past
+    /// it, so the guard has to stop one page later than a naive `>=` would.
+    #[test]
+    fn allows_the_page_that_lands_exactly_on_the_depth_limit() {
+        assert_eq!(WootApi::next_page_depth(48), MAX_SEARCH_DEPTH);
+        assert!(WootApi::next_page_depth(48) <= MAX_SEARCH_DEPTH);
+    }
+
+    #[test]
+    fn stops_before_the_first_page_that_would_exceed_the_depth_limit() {
+        assert!(WootApi::next_page_depth(49) > MAX_SEARCH_DEPTH);
+    }
+
+    /// The deepest page actually requested starts at `MAX_SEARCH_DEPTH -
+    /// PAGE_SIZE`, so paging reaches exactly `MAX_SEARCH_DEPTH` offers.
+    #[test]
+    fn reaches_the_depth_limit_exactly() {
+        let last_page = (0u8..)
+            .find(|s| WootApi::next_page_depth(*s) > MAX_SEARCH_DEPTH)
+            .unwrap();
+        assert_eq!(
+            u16::from(last_page) * PAGE_SIZE,
+            MAX_SEARCH_DEPTH - PAGE_SIZE
+        );
+        assert_eq!((u16::from(last_page) + 1) * PAGE_SIZE, MAX_SEARCH_DEPTH);
     }
 }
