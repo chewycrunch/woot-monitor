@@ -12,8 +12,7 @@ fn load_config(path: &str) -> Config {
     // missing bind mount is the usual cause.
     let contents = fs::read_to_string(path)
         .unwrap_or_else(|e| panic!("Failed to read config file {path}: {e}"));
-    serde_yaml::from_str(&contents)
-        .unwrap_or_else(|e| panic!("Invalid YAML in config file {path}: {e}"))
+    toml::from_str(&contents).unwrap_or_else(|e| panic!("Invalid TOML in config file {path}: {e}"))
 }
 
 #[tokio::main]
@@ -26,11 +25,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Welcome to Woot Monitor"
     );
 
-    let config = load_config("config.yaml");
+    let config = load_config("config.toml");
     info!(senders = config.webhooks.len(), "Loaded config");
 
-    let webhook_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies/proxies.txt"));
-    let monitor_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies/proxies.txt"));
+    let webhook_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies.txt"));
+    let monitor_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies.txt"));
     info!(
         count = webhook_proxy_manager.count(),
         file = webhook_proxy_manager

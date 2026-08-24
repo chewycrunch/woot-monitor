@@ -2,17 +2,17 @@
 # plain `docker compose` — anything that takes a compose file).
 #
 # This repo builds and pushes images; it does not run them. Copy this file into
-# your stack directory on the server, put config.yaml and proxies.txt next to it,
+# your stack directory on the server, put config.toml and proxies.txt next to it,
 # and edit the mount paths below if you keep them somewhere else.
 #
 #   stack-dir/
 #     compose.yaml     <- this file
-#     config.yaml      <- from monitor/config.example.yaml, with your real URLs
+#     config.toml      <- from monitor/config.example.toml, with your real URLs
 #     proxies.txt      <- ip:port or ip:port:user:pass, one per line
 #
-# The monitor reads ./config.yaml and ./proxies/proxies.txt relative to /app, and
+# The monitor reads ./config.toml and ./proxies.txt relative to /app, and
 # neither is baked into the image, so both mounts are required. A missing
-# config.yaml makes the container exit at startup with the path in the message.
+# config.toml makes the container exit at startup with the path in the message.
 
 services:
   monitor:
@@ -35,8 +35,8 @@ services:
       # at a missing bind-mount source, and a directory where the monitor wants
       # a file reads as an empty proxy list, not an error — so after a deploy,
       # check the startup log line for a non-zero proxy count.
-      - ./config.yaml:/app/config.yaml:ro
-      - ./proxies.txt:/app/proxies/proxies.txt:ro
+      - ./config.toml:/app/config.toml:ro
+      - ./proxies.txt:/app/proxies.txt:ro
     ports: []
     networks:
       - internal
