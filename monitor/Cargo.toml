@@ -1,6 +1,6 @@
 [package]
 name = "woot-monitor"
-version = "1.4.0"
+version = "1.5.0"
 edition = "2021"
 
 # Module files are named after the module (`webhook.rs` beside `webhook/`),
