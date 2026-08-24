@@ -20,7 +20,7 @@ const GRAPHQL_URL: &str = "https://d24qg5zsx8xdc4.cloudfront.net/graphql";
 /// GraphQL API Key. AppSync caps expiry of these at a year, "You are not
 /// authorized to make this call." means it is stale. Refresh by grepping
 /// woot.com's HTML for the `da2-` value.
-const GRAPHQL_API_KEY: &str = "da2-gdf6f2cxpnb3xikqgzzhfhovem";
+pub const DEFAULT_GRAPHQL_API_KEY: &str = "da2-gdf6f2cxpnb3xikqgzzhfhovem";
 
 /// Browser identity presented to Woot. The three values travel together for
 /// all requests.
@@ -133,11 +133,15 @@ pub fn minify_graphql(query: &str) -> String {
 /// Client for Woot's GraphQL API. Rotates to the next proxy on every request.
 pub struct WootApi {
     proxy_manager: Arc<ProxyManager>,
+    api_key: String,
 }
 
 impl WootApi {
-    pub fn new(proxy_manager: Arc<ProxyManager>) -> Self {
-        Self { proxy_manager }
+    pub fn new(proxy_manager: Arc<ProxyManager>, api_key: String) -> Self {
+        Self {
+            proxy_manager,
+            api_key,
+        }
     }
 
     /// Fetches every available offer, paging until Woot returns a short page.
@@ -243,7 +247,7 @@ impl WootApi {
 
         let response = client
             .get(url)
-            .headers(Self::graphql_headers())
+            .headers(self.graphql_headers())
             .send()
             .await?;
         let body = response.text().await?;
@@ -325,14 +329,14 @@ impl WootApi {
     }
 
     /// Headers for a cross-origin XHR from woot.com to the GraphQL endpoint.
-    fn graphql_headers() -> HeaderMap {
+    fn graphql_headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
 
         headers.insert("Host", "d24qg5zsx8xdc4.cloudfront.net".parse().unwrap());
         headers.insert("sec-ch-ua-platform", SEC_CH_UA_PLATFORM.parse().unwrap());
         headers.insert("User-Agent", USER_AGENT.parse().unwrap());
         headers.insert("sec-ch-ua", SEC_CH_UA.parse().unwrap());
-        headers.insert("x-api-key", GRAPHQL_API_KEY.parse().unwrap());
+        headers.insert("x-api-key", self.api_key.parse().unwrap());
         headers.insert("sec-ch-ua-mobile", "?0".parse().unwrap());
         headers.insert("Accept", "*/*".parse().unwrap());
         headers.insert("Origin", "https://www.woot.com".parse().unwrap());
