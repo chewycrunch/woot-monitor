@@ -15,6 +15,7 @@ use tracing::{debug, error, info};
 use self::product::{Product, Products};
 use self::tls_api::TlsClient;
 use self::woot_api::WootApi;
+use crate::config::Config;
 use crate::proxy::ProxyManager;
 use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 
@@ -43,16 +44,15 @@ impl Monitor {
     pub fn new(
         webhook_manager: WebhookManager,
         proxy_manager: Arc<ProxyManager>,
-        graphql_api_key: String,
-        delay: Duration,
+        config: &Config,
     ) -> Self {
         Self {
-            delay,
+            delay: Duration::from_millis(config.delay_ms),
             products: Products::new(),
             webhook_manager,
-            woot_api: WootApi::new(Arc::clone(&proxy_manager), graphql_api_key),
+            woot_api: WootApi::new(Arc::clone(&proxy_manager), config.graphql_api_key.clone()),
             proxy_manager,
-            tls_client: TlsClient::new(),
+            tls_client: TlsClient::new(config.tls_api_url.clone(), &config.tls_api_key),
         }
     }
 

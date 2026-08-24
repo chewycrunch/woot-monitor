@@ -16,7 +16,7 @@ Upstream is built from source at image build time rather than vendored here — 
 
 ## Running locally
 
-The monitor talks to the tls-client API at `TLS_API_URL`, defaulting to
+The monitor talks to the tls-client API at `WOOT_TLS_API_URL`, defaulting to
 `http://127.0.0.1:8080`. Nothing needs Docker:
 
 ```sh
@@ -29,7 +29,7 @@ cd monitor && cargo run    # in another shell
 `tls-client/config.dev.yml` — no Go toolchain, no build. The binary is cached in
 `.local/`, which is gitignored; delete it to pick up a version bump.
 
-To point the monitor at an API somewhere else, set `TLS_API_URL`
+To point the monitor at an API somewhere else, set `WOOT_TLS_API_URL`
 (see `monitor/.env.example`; `.env` is loaded at startup).
 
 `docker-bake.hcl` holds the image build definitions — it is a build manifest, not a
@@ -58,7 +58,7 @@ The monitor reads both at paths relative to its working directory, so run it fro
 the startup log.
 
 Everything else is environment variables, loaded from `monitor/.env` at startup:
-`TLS_API_URL`, `RUST_LOG`, `LOG_FORMAT`. See `monitor/.env.example`.
+`WOOT_TLS_API_URL`, `WOOT_TLS_API_KEY`, `WOOT_DELAY_MS`, `RUST_LOG`, `LOG_FORMAT`. See `monitor/.env.example`.
 
 ## Running the published images on a server
 
@@ -71,7 +71,7 @@ For a one-off run without compose:
 
 ```sh
 docker run --rm \
-  -e TLS_API_URL=http://tls-client:8080 \
+  -e WOOT_TLS_API_URL=http://tls-client:8080 \
   -v "$PWD/monitor/config.toml:/app/config.toml:ro" \
   -v "$PWD/monitor/proxies.txt:/app/proxies.txt:ro" \
   ghcr.io/chewycrunch/woot-monitor/monitor:latest
