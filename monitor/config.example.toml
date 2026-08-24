@@ -6,10 +6,6 @@
 # The monitor reads ./config.toml relative to its working directory (/app in the
 # image) and refuses to start without it. See the README for how to mount it.
 
-# Woot's public AppSync key. Optional — the binary carries a working default and
-# WOOT_GRAPHQL_API_KEY overrides both, so a rotation needs only a restart.
-# graphql_api_key = "da2-..."
-
 # `name` labels the entry in logs. Each may set any combination of the three
 # URLs; omit one and that class of notification is not sent.
 [[webhooks]]
