@@ -14,17 +14,16 @@ use urlencoding::encode;
 use super::product::Product;
 use crate::proxy::ProxyManager;
 
-/// GraphQL endpoint backing woot.com's own search.
+/// GraphQL endpoint
 const GRAPHQL_URL: &str = "https://d24qg5zsx8xdc4.cloudfront.net/graphql";
 
-/// Public API key woot.com ships to its own front end. AppSync caps these at a
-/// year, so it expires on its own; "You are not authorized to make this call."
-/// means it is stale. Refresh by grepping woot.com's HTML for the `da2-` value.
+/// GraphQL API Key. AppSync caps expiry of these at a year, "You are not
+/// authorized to make this call." means it is stale. Refresh by grepping
+/// woot.com's HTML for the `da2-` value.
 const GRAPHQL_API_KEY: &str = "da2-gdf6f2cxpnb3xikqgzzhfhovem";
 
-/// Browser identity presented to Woot. The three values travel together — a
-/// `User-Agent` naming one Chrome version alongside a `sec-ch-ua` naming another
-/// is a fingerprint mismatch, so bump them as a set.
+/// Browser identity presented to Woot. The three values travel together for
+/// all requests.
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
 const SEC_CH_UA: &str = r#""Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24""#;
 const SEC_CH_UA_PLATFORM: &str = "\"Windows\"";
