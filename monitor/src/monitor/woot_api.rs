@@ -18,7 +18,14 @@ use crate::proxy::ProxyManager;
 const GRAPHQL_URL: &str = "https://d24qg5zsx8xdc4.cloudfront.net/graphql";
 
 /// Public API key woot.com ships to its own front end.
-const GRAPHQL_API_KEY: &str = "da2-hk2jpo7aljfvxollvmieghuqlu";
+///
+/// This is an AppSync API key, which AWS caps at a 365-day lifetime, so it goes
+/// stale on its own schedule regardless of anything on our side. An expired key
+/// surfaces as `UnauthorizedException` with "You are not authorized to make this
+/// call." — as distinct from "Valid authorization header not provided.", which
+/// means the header never went out. Refresh it by grepping woot.com's HTML for
+/// the current `da2-` value.
+const GRAPHQL_API_KEY: &str = "da2-gdf6f2cxpnb3xikqgzzhfhovem";
 
 /// Browser identity presented to Woot. The three values travel together — a
 /// `User-Agent` naming one Chrome version alongside a `sec-ch-ua` naming another
