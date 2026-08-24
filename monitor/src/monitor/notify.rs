@@ -124,6 +124,7 @@ mod tests {
             id: "42".to_string(),
             out_of_stock: false,
             title: "Anker USB-C Cable".to_string(),
+            start_date: chrono::Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
             end_date: chrono::Utc.with_ymd_and_hms(2026, 1, 2, 3, 4, 5).unwrap(),
             list_price: None,
             sale_price: None,

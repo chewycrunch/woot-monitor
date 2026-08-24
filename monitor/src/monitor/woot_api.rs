@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use reqwest::header::HeaderMap;
 use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
@@ -34,6 +34,11 @@ const PAGE_SIZE: u16 = 200;
 /// Woot's GraphQL API rejects any search whose `Skip + Limit` exceeds this, so
 /// the catalog is only reachable this deep however many offers match.
 const MAX_SEARCH_DEPTH: u16 = 10_000;
+
+/// How far past the newest offer already seen a poll keeps paging. Woot lists in
+/// daily batches sharing one timestamp, and a new offer joins its batch at an
+/// arbitrary position, so stopping at the first known offer would step over it.
+const LOOKBACK: TimeDelta = TimeDelta::hours(24);
 
 /// Public URL of an offer's page on woot.com.
 pub fn offer_url(slug: &str) -> String {
@@ -83,6 +88,8 @@ pub struct WootOffer {
     pub title: String,
     #[serde(rename = "Photos")]
     pub photos: Option<Vec<Photo>>,
+    #[serde(rename = "StartDate")]
+    pub start_date: DateTime<Utc>,
     #[serde(rename = "EndDate")]
     pub end_date: DateTime<Utc>,
     #[serde(rename = "Items")]
@@ -198,6 +205,72 @@ impl WootApi {
         (u16::from(skip) + 1) * PAGE_SIZE + PAGE_SIZE
     }
 
+    /// Whether a page reached past `cutoff`. Strictly-older, never equal: offers
+    /// sharing a timestamp can straddle a page boundary, so stopping on equality
+    /// would skip the rest of that batch.
+    fn page_passed_cutoff(oldest_on_page: Option<DateTime<Utc>>, cutoff: DateTime<Utc>) -> bool {
+        oldest_on_page.is_some_and(|oldest| oldest < cutoff)
+    }
+
+    /// Offers listed at or after `since`, less [`LOOKBACK`]. Pages only as deep
+    /// as that cutoff, which `NewestFirst` makes a contiguous prefix.
+    pub async fn fetch_offers_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Vec<Product>, Box<dyn std::error::Error>> {
+        let cutoff = since - LOOKBACK;
+        let mut all_products = Vec::new();
+        let mut skip: u8 = 0;
+
+        loop {
+            let response = self.fetch_offers(PAGE_SIZE, skip).await?;
+
+            let data = response
+                .data
+                .ok_or("Missing `data` field in GraphQL response")?;
+            let search_offers = data
+                .search_offers
+                .ok_or("Missing `searchOffers` field in GraphQL response")?;
+
+            let offers = search_offers.offers;
+            if offers.is_empty() {
+                break;
+            }
+
+            // The page whose last offer predates the cutoff is the one the
+            // cutoff falls inside, so everything at or after it has been read.
+            let passed_cutoff =
+                Self::page_passed_cutoff(offers.last().map(|offer| offer.start_date), cutoff);
+            let count = offers.len();
+
+            all_products.extend(offers.into_iter().map(Product::from));
+
+            if passed_cutoff || count < PAGE_SIZE.into() {
+                break;
+            }
+
+            if Self::next_page_depth(skip) > MAX_SEARCH_DEPTH {
+                warn!(
+                    fetched = all_products.len(),
+                    depth = MAX_SEARCH_DEPTH,
+                    "Reached Woot's search depth limit before the cutoff"
+                );
+                break;
+            }
+
+            skip += 1
+        }
+
+        info!(
+            requests = skip + 1,
+            offers = all_products.len(),
+            %cutoff,
+            "Fetched offers since cutoff"
+        );
+
+        Ok(all_products)
+    }
+
     /// Fetches a single page of offers. `skip` is a page index, not an offset.
     async fn fetch_offers(
         &self,
@@ -223,6 +296,7 @@ impl WootApi {
                             Id
                             SoldOut
                             Title
+                            StartDate
                             EndDate
                             Items {{
                                 ListPrice
@@ -353,6 +427,7 @@ impl WootApi {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::TimeZone;
 
     /// The limit is inclusive, so a naive `>=` would drop the last valid page.
     #[test]
@@ -377,5 +452,34 @@ mod tests {
             MAX_SEARCH_DEPTH - PAGE_SIZE
         );
         assert_eq!((u16::from(last_page) + 1) * PAGE_SIZE, MAX_SEARCH_DEPTH);
+    }
+
+    fn at(hour: u32) -> DateTime<Utc> {
+        chrono::Utc
+            .with_ymd_and_hms(2026, 8, 24, hour, 0, 0)
+            .unwrap()
+    }
+
+    #[test]
+    fn stops_once_a_page_reaches_past_the_cutoff() {
+        assert!(WootApi::page_passed_cutoff(Some(at(3)), at(5)));
+    }
+
+    /// Woot lists in batches sharing one timestamp, and a batch can span pages.
+    /// Stopping on equality would skip the remainder of that batch, which is
+    /// where a new offer can sit.
+    #[test]
+    fn keeps_paging_when_a_page_ends_exactly_on_the_cutoff() {
+        assert!(!WootApi::page_passed_cutoff(Some(at(5)), at(5)));
+    }
+
+    #[test]
+    fn keeps_paging_while_the_page_is_newer_than_the_cutoff() {
+        assert!(!WootApi::page_passed_cutoff(Some(at(9)), at(5)));
+    }
+
+    #[test]
+    fn an_empty_page_does_not_count_as_reaching_the_cutoff() {
+        assert!(!WootApi::page_passed_cutoff(None, at(5)));
     }
 }
