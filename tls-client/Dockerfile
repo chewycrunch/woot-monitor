@@ -35,4 +35,9 @@ COPY --from=builder /out/tls-client-api /app/tls-client-api
 # main.go loads `<dir of executable>/config.dist.yml`
 COPY config.yml /app/config.dist.yml
 
+# gosoline serves this on the health port from config.yml. Not published, so it
+# is only reachable from inside the container - which is where this runs.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8081/health || exit 1
+
 CMD ["/app/tls-client-api"]
