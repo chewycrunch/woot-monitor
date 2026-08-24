@@ -12,8 +12,8 @@ fn default_graphql_api_key() -> String {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// Woot's public AppSync key. Overridable so a rotation needs a restart
-    /// rather than a rebuild.
+    /// Woot's public AppSync key, normally supplied by WOOT_GRAPHQL_API_KEY.
+    /// Defaulted, so config.toml carries webhooks only.
     #[serde(default = "default_graphql_api_key")]
     pub graphql_api_key: String,
 
