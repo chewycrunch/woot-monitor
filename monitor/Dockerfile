@@ -47,7 +47,7 @@ RUN apk add --no-cache ca-certificates
 # Copy static binary
 COPY --from=builder /woot-monitor /usr/local/bin/woot-monitor
 
-# No config is baked in. The monitor reads ./config.toml and ./proxies/proxies.txt
+# No config is baked in. The monitor reads ./config.toml and ./proxies.txt
 # relative to this WORKDIR, and both hold private data (webhook URLs, proxy
 # credentials), so they are bind-mounted at run time instead — see the README.
 # A missing config.toml aborts at startup rather than running against a stale or

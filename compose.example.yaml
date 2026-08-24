@@ -10,7 +10,7 @@
 #     config.toml      <- from monitor/config.example.toml, with your real URLs
 #     proxies.txt      <- ip:port or ip:port:user:pass, one per line
 #
-# The monitor reads ./config.toml and ./proxies/proxies.txt relative to /app, and
+# The monitor reads ./config.toml and ./proxies.txt relative to /app, and
 # neither is baked into the image, so both mounts are required. A missing
 # config.toml makes the container exit at startup with the path in the message.
 
@@ -36,7 +36,7 @@ services:
       # a file reads as an empty proxy list, not an error — so after a deploy,
       # check the startup log line for a non-zero proxy count.
       - ./config.toml:/app/config.toml:ro
-      - ./proxies.txt:/app/proxies/proxies.txt:ro
+      - ./proxies.txt:/app/proxies.txt:ro
     ports: []
     networks:
       - internal

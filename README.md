@@ -43,12 +43,12 @@ keeps its own copy:
 | File | Copy from | Holds |
 |---|---|---|
 | `monitor/config.toml` | `monitor/config.example.toml` | webhook URLs, keywords, ASINs |
-| `monitor/proxies/proxies.txt` | `monitor/proxies/proxies.example.txt` | `ip:port` or `ip:port:user:pass`, one per line |
+| `monitor/proxies.txt` | `monitor/proxies.example.txt` | `ip:port` or `ip:port:user:pass`, one per line |
 
 ```sh
 cd monitor
 cp config.example.toml config.toml
-cp proxies/proxies.example.txt proxies/proxies.txt
+cp proxies.example.txt proxies.txt
 ```
 
 The monitor reads both at paths relative to its working directory, so run it from
@@ -73,7 +73,7 @@ For a one-off run without compose:
 docker run --rm \
   -e TLS_API_URL=http://tls-client:8080 \
   -v "$PWD/monitor/config.toml:/app/config.toml:ro" \
-  -v "$PWD/monitor/proxies/proxies.txt:/app/proxies/proxies.txt:ro" \
+  -v "$PWD/monitor/proxies.txt:/app/proxies.txt:ro" \
   ghcr.io/chewycrunch/woot-monitor/monitor:latest
 ```
 

@@ -7,4 +7,4 @@ target/
 # are bind-mounted at run time. Without these lines a local build silently ships
 # whatever the developer happens to have on disk.
 config.toml
-proxies/proxies.txt
+proxies.txt
