@@ -40,12 +40,16 @@ fn next_backoff(current: Duration) -> Duration {
 }
 
 impl Monitor {
-    pub fn new(webhook_manager: WebhookManager, proxy_manager: Arc<ProxyManager>) -> Self {
+    pub fn new(
+        webhook_manager: WebhookManager,
+        proxy_manager: Arc<ProxyManager>,
+        graphql_api_key: String,
+    ) -> Self {
         Self {
             delay: Duration::from_secs(5),
             products: Products::new(),
             webhook_manager,
-            woot_api: WootApi::new(Arc::clone(&proxy_manager)),
+            woot_api: WootApi::new(Arc::clone(&proxy_manager), graphql_api_key),
             proxy_manager,
             tls_client: TlsClient::new(),
         }

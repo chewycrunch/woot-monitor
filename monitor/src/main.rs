@@ -1,4 +1,3 @@
-use std::fs;
 use std::sync::Arc;
 use tracing::info;
 use woot_monitor::config::Config;
@@ -6,14 +5,6 @@ use woot_monitor::logging;
 use woot_monitor::monitor::Monitor;
 use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
-
-fn load_config(path: &str) -> Config {
-    // Path is relative to the working directory (/app in the image), where a
-    // missing bind mount is the usual cause.
-    let contents = fs::read_to_string(path)
-        .unwrap_or_else(|e| panic!("Failed to read config file {path}: {e}"));
-    toml::from_str(&contents).unwrap_or_else(|e| panic!("Invalid TOML in config file {path}: {e}"))
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,7 +16,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Welcome to Woot Monitor"
     );
 
-    let config = load_config("config.toml");
+    // Path is relative to the working directory (/app in the image), where a
+    // missing bind mount is the usual cause.
+    let config = Config::load("config.toml")
+        .unwrap_or_else(|e| panic!("Failed to load config file config.toml: {e}"));
+    let graphql_api_key = config.graphql_api_key.clone();
     info!(senders = config.webhooks.len(), "Loaded config");
 
     let webhook_proxy_manager = Arc::new(ProxyManager::new_from_file("proxies.txt"));
@@ -49,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     webhook_manager.register_from_configs(config.webhooks);
     info!("Created webhook manager");
 
-    let mut monitor = Monitor::new(webhook_manager, monitor_proxy_manager);
+    let mut monitor = Monitor::new(webhook_manager, monitor_proxy_manager, graphql_api_key);
     monitor.start().await;
 
     Ok(())
