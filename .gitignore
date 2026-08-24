@@ -1,4 +1,8 @@
+# Local runtime config — real webhook URLs and proxies. Both are mounted into
+# the container at run time; the repo carries only the .example counterparts.
+monitor/config.yaml
 monitor/proxies/proxies.txt
+
 .env
 .claude/
 .local/

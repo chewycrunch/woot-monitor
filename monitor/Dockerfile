@@ -47,10 +47,11 @@ RUN apk add --no-cache ca-certificates
 # Copy static binary
 COPY --from=builder /woot-monitor /usr/local/bin/woot-monitor
 
-# Copy config + proxies
-COPY ./proxies ./proxies
-COPY ./config.yaml ./config.yaml
-
+# No config is baked in. The monitor reads ./config.yaml and ./proxies/proxies.txt
+# relative to this WORKDIR, and both hold private data (webhook URLs, proxy
+# credentials), so they are bind-mounted at run time instead — see the README.
+# A missing config.yaml aborts at startup rather than running against a stale or
+# placeholder one.
 
 USER appuser
 CMD ["/usr/local/bin/woot-monitor"]
