@@ -3,27 +3,28 @@
 #
 # This repo builds and pushes images; it does not run them. Copy this file into
 # your stack directory on the server, put config.yaml and proxies.txt next to it,
-# and edit the paths below if you keep them somewhere else.
+# and edit the mount paths below if you keep them somewhere else.
+#
+#   stack-dir/
+#     compose.yaml     <- this file
+#     config.yaml      <- from monitor/config.example.yaml, with your real URLs
+#     proxies.txt      <- ip:port or ip:port:user:pass, one per line
 #
 # The monitor reads ./config.yaml and ./proxies/proxies.txt relative to /app, and
 # neither is baked into the image, so both mounts are required. A missing
 # config.yaml makes the container exit at startup with the path in the message.
 
 services:
-  tls-client:
-    image: ghcr.io/chewycrunch/woot-monitor/tls-client:latest
-    restart: unless-stopped
-    # Nothing to configure: config.dist.yml is baked into the image, and the API
-    # is only reachable from the monitor on this network — no ports published.
-
   monitor:
     image: ghcr.io/chewycrunch/woot-monitor/monitor:latest
     restart: unless-stopped
     depends_on:
-      - tls-client
+      tls-client:
+        condition: service_started
+        restart: false
     environment:
-      # Both containers are on this compose network, so the sidecar is reachable
-      # by service name. The image's default (127.0.0.1:8080) is wrong here.
+      # Both containers share this network, so the sidecar is reachable by
+      # service name. The image default (127.0.0.1:8080) is wrong here.
       TLS_API_URL: http://tls-client:8080
       # Optional. Defaults to woot_monitor=info,offers=info.
       # RUST_LOG: woot_monitor=debug,offers=info,reqwest=warn
@@ -36,3 +37,19 @@ services:
       # check the startup log line for a non-zero proxy count.
       - ./config.yaml:/app/config.yaml:ro
       - ./proxies.txt:/app/proxies/proxies.txt:ro
+    ports: []
+    networks:
+      - internal
+
+  tls-client:
+    image: ghcr.io/chewycrunch/woot-monitor/tls-client:latest
+    restart: unless-stopped
+    # Nothing to configure: config.dist.yml is baked into this image, and the API
+    # is only reachable from the monitor on this network — no ports published.
+    ports: []
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
