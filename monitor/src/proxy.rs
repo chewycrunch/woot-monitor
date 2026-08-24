@@ -10,12 +10,19 @@ pub struct Proxy {
 }
 
 impl Proxy {
+    /// Renders the proxy as a URL for the tls-client sidecar's `proxyUrl` field.
+    ///
+    /// Credentials go between the scheme and the host, so the scheme is written
+    /// exactly once — building the bare `http://host:port` first and prefixing
+    /// the userinfo onto it yields `http://user:pass@http://host:port`, which no
+    /// client can parse.
     pub fn to_proxy_url(&self) -> String {
-        let mut url = format!("http://{}:{}", self.host, self.port);
-        if let (Some(ref user), Some(ref pass)) = (&self.user, &self.pass) {
-            url = format!("http://{}:{}@{}", user, pass, url);
+        match (&self.user, &self.pass) {
+            (Some(user), Some(pass)) => {
+                format!("http://{}:{}@{}:{}", user, pass, self.host, self.port)
+            }
+            _ => format!("http://{}:{}", self.host, self.port),
         }
-        url
     }
     pub fn to_reqwest_proxy(&self) -> Option<reqwest::Proxy> {
         let url = format!("http://{}:{}", self.host, self.port);
@@ -89,5 +96,45 @@ impl ProxyManager {
 
     pub fn filename(&self) -> Option<String> {
         self.filename.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn proxy(user: Option<&str>, pass: Option<&str>) -> Proxy {
+        Proxy {
+            host: "45.3.38.37".to_string(),
+            port: 3129,
+            user: user.map(String::from),
+            pass: pass.map(String::from),
+        }
+    }
+
+    #[test]
+    fn puts_credentials_between_the_scheme_and_the_host() {
+        assert_eq!(
+            proxy(Some("user"), Some("pass")).to_proxy_url(),
+            "http://user:pass@45.3.38.37:3129"
+        );
+    }
+
+    #[test]
+    fn omits_the_userinfo_when_there_are_no_credentials() {
+        assert_eq!(proxy(None, None).to_proxy_url(), "http://45.3.38.37:3129");
+    }
+
+    /// The scheme is the part that used to be duplicated, and the sidecar takes
+    /// the string verbatim, so a second occurrence would go out unnoticed.
+    #[test]
+    fn writes_the_scheme_exactly_once() {
+        assert_eq!(
+            proxy(Some("user"), Some("pass"))
+                .to_proxy_url()
+                .matches("http://")
+                .count(),
+            1
+        );
     }
 }
