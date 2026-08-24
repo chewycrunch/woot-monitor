@@ -44,9 +44,10 @@ impl Monitor {
         webhook_manager: WebhookManager,
         proxy_manager: Arc<ProxyManager>,
         graphql_api_key: String,
+        delay: Duration,
     ) -> Self {
         Self {
-            delay: Duration::from_secs(5),
+            delay,
             products: Products::new(),
             webhook_manager,
             woot_api: WootApi::new(Arc::clone(&proxy_manager), graphql_api_key),
