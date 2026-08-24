@@ -8,7 +8,7 @@ variable "REGISTRY" {
   default = "ghcr.io/chewycrunch/woot-monitor"
 }
 
-# Override to publish a versioned tag, e.g. `TAG=v1.4.0 task push`.
+# Override to publish a versioned tag, e.g. `TAG=v1.5.0 task push`.
 variable "TAG" {
   default = "latest"
 }
