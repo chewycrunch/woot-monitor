@@ -64,9 +64,18 @@ impl Config {
 pub struct WebhookConfig {
     pub name: String,
 
-    pub junk_url: Option<String>,
-    pub unfiltered_url: Option<String>,
-    pub filtered_url: Option<String>,
+    /// Offers the ASIN and review-count scrape could not vouch for, including
+    /// ones where the scrape itself came back empty.
+    #[serde(alias = "junk_url")]
+    pub unverified_url: Option<String>,
+
+    /// Offers with an ASIN and at least [`MIN_REVIEWS`] reviews.
+    #[serde(alias = "unfiltered_url")]
+    pub verified_url: Option<String>,
+
+    /// Offers matching `keywords` or `asins` below.
+    #[serde(alias = "filtered_url")]
+    pub watchlist_url: Option<String>,
 
     pub keywords: Option<Vec<String>>,
     pub asins: Option<Vec<String>>,
@@ -97,6 +106,43 @@ mod tests {
             .webhooks
             .iter()
             .all(|w| w.keywords.is_some() && w.asins.is_some()));
+        assert!(config.webhooks.iter().all(|w| w.verified_url.is_some()
+            && w.unverified_url.is_some()
+            && w.watchlist_url.is_some()));
+    }
+
+    /// A deployed config.toml still uses the old key names, so the aliases have
+    /// to keep routing each one to the same channel it always meant.
+    #[test]
+    fn the_old_webhook_key_names_still_load() {
+        let config: Config = config::Config::builder()
+            .add_source(File::from_str(
+                r#"
+                [[webhooks]]
+                name = "legacy"
+                junk_url = "https://example.invalid/junk"
+                unfiltered_url = "https://example.invalid/unfiltered"
+                filtered_url = "https://example.invalid/filtered"
+                "#,
+                FileFormat::Toml,
+            ))
+            .build()
+            .and_then(config::Config::try_deserialize)
+            .expect("legacy webhook keys should still parse");
+
+        let hook = &config.webhooks[0];
+        assert_eq!(
+            hook.unverified_url.as_deref(),
+            Some("https://example.invalid/junk")
+        );
+        assert_eq!(
+            hook.verified_url.as_deref(),
+            Some("https://example.invalid/unfiltered")
+        );
+        assert_eq!(
+            hook.watchlist_url.as_deref(),
+            Some("https://example.invalid/filtered")
+        );
     }
 
     /// The point of the env layer: rotating the key needs a restart, not a build.
