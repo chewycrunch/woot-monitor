@@ -3,11 +3,27 @@ use crate::{
     proxy::ProxyManager,
     webhook::{discord::DiscordWebhook, WebhookPayload},
 };
-use std::collections::HashSet;
 use std::sync::Arc;
 
 /// Reviews an offer needs, alongside an ASIN, to count as verified.
 pub const MIN_REVIEWS: u32 = 200;
+
+/// Reduces text to its lowercased words, space-delimited and space-padded, so
+/// `contains` matches whole words only: " nest " does not occur in " honest ",
+/// while a multi-word keyword like "instant pot" survives as one string.
+fn normalize(text: &str) -> String {
+    let mut normalized = String::from(" ");
+
+    for word in text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+    {
+        normalized.push_str(&word.to_lowercase());
+        normalized.push(' ');
+    }
+
+    normalized
+}
 
 pub struct WebhookManager {
     proxy_manager: Arc<ProxyManager>,
@@ -46,7 +62,17 @@ impl WebhookManager {
 
             if let Some(url) = &cfg.watchlist_url {
                 let hook = DiscordWebhook::new(Arc::clone(&self.proxy_manager), url.clone());
-                let keywords = cfg.keywords.clone().unwrap_or_default();
+                // Normalized once here rather than per offer. Keywords that
+                // are punctuation-only normalize to " " and would match every
+                // title, so they are dropped instead.
+                let keywords: Vec<String> = cfg
+                    .keywords
+                    .clone()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|keyword| normalize(keyword))
+                    .filter(|keyword| keyword != " ")
+                    .collect();
                 let asins = cfg.asins.clone().unwrap_or_default();
 
                 self.watchlist.push((hook, keywords, asins));
@@ -70,24 +96,16 @@ impl WebhookManager {
         // Independent of the split above: a keyword match is an explicit
         // request, so it is not gated on the offer being verified.
         let hooks: Vec<&DiscordWebhook> = {
-            let lower = item_info.title.to_lowercase();
-            let words: HashSet<String> = lower
-                .split(|c: char| !c.is_alphanumeric())
-                .filter(|w| !w.is_empty())
-                .map(String::from) // No need for another to_lowercase()
-                .collect();
-
-            let asin_lower = item_info.asin.as_ref().map(|s| s.to_lowercase());
+            let title = normalize(&item_info.title);
+            let asin_lower = item_info.asin.as_ref().map(|asin| asin.to_lowercase());
 
             self.watchlist
                 .iter()
                 .filter(|(_, keywords, asins)| {
-                    keywords
-                        .iter()
-                        .any(|kw| words.contains(kw.to_lowercase().as_str()))
+                    keywords.iter().any(|keyword| title.contains(keyword))
                         || asins
                             .iter()
-                            .map(|s| s.to_lowercase())
+                            .map(|asin| asin.to_lowercase())
                             .any(|asin| Some(asin) == asin_lower)
                 })
                 .map(|(hook, _, _)| hook)
@@ -97,5 +115,68 @@ impl WebhookManager {
         for hook in hooks {
             let _ = hook.send(payload.clone()).await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Keywords are stored normalized, so a match is `contains` on the title.
+    fn matches(keyword: &str, title: &str) -> bool {
+        normalize(title).contains(&normalize(keyword))
+    }
+
+    #[test]
+    fn matches_a_single_word_anywhere_in_the_title() {
+        assert!(matches("ninja", "Ninja Professional Blender"));
+        assert!(matches("ninja", "Refurbished Ninja"));
+    }
+
+    /// The previous matcher split the title into whole words and looked each
+    /// keyword up, so every multi-word entry in a config could never fire.
+    #[test]
+    fn matches_multi_word_keywords() {
+        assert!(matches("instant pot", "Instant Pot Duo 6qt"));
+        assert!(matches("6700 xt", "AMD Radeon RX 6700 XT 12GB"));
+    }
+
+    /// Punctuation is a word break on both sides, not a deletion, so "g.skill"
+    /// and "gskill" stay distinct tokens. That is why a config wanting both
+    /// spellings has to list both, as this one does.
+    #[test]
+    fn treats_punctuation_as_a_word_break() {
+        assert!(matches("g.skill", "G.SKILL Trident Z 32GB"));
+        assert!(matches("g.skill", "G Skill Trident Z"));
+        assert!(matches("gskill", "GSKILL Trident Z"));
+
+        assert!(!matches("g.skill", "GSKILL Trident Z"));
+        assert!(!matches("gskill", "G.Skill Trident Z"));
+    }
+
+    #[test]
+    fn ignores_case_on_both_sides() {
+        assert!(matches("DEWALT", "dewalt drill"));
+    }
+
+    /// Substring matching without word boundaries would fire "nest" on
+    /// "Honest", which is why the normalized forms are space-padded.
+    #[test]
+    fn does_not_match_inside_a_longer_word() {
+        assert!(!matches("nest", "The Honest Company Wipes"));
+        assert!(!matches("shark", "Sharkskin Wallet"));
+    }
+
+    #[test]
+    fn does_not_match_a_different_word() {
+        assert!(!matches("dyson", "Shark Vacuum"));
+    }
+
+    /// A keyword of only punctuation normalizes to " ", which every title
+    /// contains, so registration drops those rather than matching everything.
+    #[test]
+    fn punctuation_only_keywords_normalize_to_a_bare_space() {
+        assert_eq!(normalize("---"), " ");
+        assert_eq!(normalize(""), " ");
     }
 }
