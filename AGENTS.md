@@ -26,6 +26,7 @@ Stop after each phase for user review. **Docs carry current intent, written to b
 | Design tree (sub-HLDs, LLDs, their specs) | `docs/intent/` — one folder per node |
 | EARS specs | beside each design doc as `{node}-specs.md` in the node's folder under `docs/intent/` |
 | Decision docs | `docs/decisions/` (project-level) and `docs/intent/<segment>/decisions/` |
+| Specs without tests | `docs/test-coverage.md` |
 
 ### Terminology
 
