@@ -57,6 +57,7 @@ impl TlsClient {
         Self { http, base_url }
     }
 
+    // @spec FETCHING-011, FETCHING-013, FETCHING-014, FETCHING-017
     /// Forwards a GET through the sidecar and returns the decoded envelope.
     ///
     /// Each forward opens a session on the sidecar, so the session is freed

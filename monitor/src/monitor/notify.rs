@@ -151,32 +151,38 @@ mod tests {
             .find(|f| f.name == name)
     }
 
+    // @spec ROUTING-040
     #[test]
     fn shows_only_the_sale_price_when_there_is_no_list_price() {
         assert_eq!(price_label(None, Some(1234)), "$12.34");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn treats_a_zero_list_price_as_no_discount() {
         assert_eq!(price_label(Some(0), Some(1234)), "$12.34");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn strikes_through_the_list_price_when_discounted() {
         assert_eq!(price_label(Some(2000), Some(1234)), "~~$20.00~~ $12.34");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn renders_a_missing_sale_price_as_free() {
         assert_eq!(price_label(None, None), "$0.00");
     }
 
+    // @spec ROUTING-044
     #[test]
     fn pads_cents_below_ten() {
         assert_eq!(price_label(None, Some(1205)), "$12.05");
         assert_eq!(price_label(None, Some(7)), "$0.07");
     }
 
+    // @spec ROUTING-044
     #[test]
     fn formats_prices_above_the_old_u16_ceiling() {
         assert_eq!(
@@ -185,12 +191,14 @@ mod tests {
         );
     }
 
+    // @spec ROUTING-042
     #[test]
     fn names_an_unlabelled_variant() {
         let payload = offer_payload(&product(vec![variant(None, Some(999))], vec![]), None, None);
         assert!(field(&payload, "Default Variant").is_some());
     }
 
+    // @spec ROUTING-040
     #[test]
     fn links_the_offer_and_titles_the_embed() {
         let payload = offer_payload(&product(vec![], vec![]), None, None);
@@ -203,6 +211,7 @@ mod tests {
         );
     }
 
+    // @spec ROUTING-043
     #[test]
     fn uses_the_first_photo_as_the_thumbnail() {
         let photos = vec![
@@ -224,12 +233,14 @@ mod tests {
         );
     }
 
+    // @spec ROUTING-043
     #[test]
     fn omits_the_thumbnail_when_there_are_no_photos() {
         let payload = offer_payload(&product(vec![], vec![]), None, None);
         assert!(payload.embeds.as_ref().unwrap()[0].thumbnail.is_none());
     }
 
+    // @spec ROUTING-041
     #[test]
     fn includes_reviews_and_amazon_only_when_known() {
         let bare = offer_payload(&product(vec![], vec![]), None, None);

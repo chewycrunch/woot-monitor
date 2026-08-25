@@ -50,6 +50,7 @@ pub struct Config {
 }
 
 impl Config {
+    // @spec CONFIG-001, CONFIG-002, CONFIG-003, CONFIG-006, CONFIG-011, CONFIG-012, CONFIG-021, CONFIG-022
     /// Loads `path`, then lets `WOOT_*` env vars override what it contains.
     pub fn load(path: &str) -> Result<Self, ConfigError> {
         config::Config::builder()
@@ -85,6 +86,7 @@ pub struct WebhookConfig {
 mod tests {
     use super::*;
 
+    // @spec CONFIG-010, CONFIG-012
     /// The example is the only committed copy of the config shape.
     #[test]
     fn the_shipped_example_parses() {
@@ -111,6 +113,7 @@ mod tests {
             && w.watchlist_url.is_some()));
     }
 
+    // @spec CONFIG-022
     /// A deployed config.toml still uses the old key names, so the aliases have
     /// to keep routing each one to the same channel it always meant.
     #[test]
@@ -145,6 +148,7 @@ mod tests {
         );
     }
 
+    // @spec CONFIG-002, CONFIG-003
     /// The point of the env layer: rotating the key needs a restart, not a build.
     #[test]
     fn an_env_var_overrides_the_key_from_the_file() {
@@ -165,6 +169,7 @@ mod tests {
         assert_eq!(config.graphql_api_key, "da2-fromenv");
     }
 
+    // @spec CONFIG-002
     /// The delay drives request volume: ~50 paged requests per poll makes the
     /// interval the main lever on how hard the proxies are worked.
     #[test]
@@ -186,6 +191,7 @@ mod tests {
         assert_eq!(config.delay_ms, 30_000);
     }
 
+    // @spec CONFIG-002
     /// The sidecar takes the same key through its own API_AUTH_KEYS, so one
     /// stack-level value has to reach both containers.
     #[test]

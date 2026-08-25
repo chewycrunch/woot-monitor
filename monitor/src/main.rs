@@ -6,6 +6,7 @@ use woot_monitor::monitor::Monitor;
 use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
 
+// @spec CONFIG-004, CONFIG-020, CONFIG-030, FETCHING-004, FETCHING-006
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();

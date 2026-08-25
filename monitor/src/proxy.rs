@@ -10,6 +10,7 @@ pub struct Proxy {
 }
 
 impl Proxy {
+    // @spec FETCHING-015
     /// Renders the proxy as a URL for the sidecar's `proxyUrl` field, with the
     /// credentials between the scheme and the host so the scheme appears once.
     pub fn to_proxy_url(&self) -> String {
@@ -39,6 +40,7 @@ pub struct ProxyManager {
 }
 
 impl ProxyManager {
+    // @spec FETCHING-001, FETCHING-002, FETCHING-003
     pub fn new_from_file(path: &str) -> Self {
         let contents = fs::read_to_string(path).unwrap_or_default();
 
@@ -74,6 +76,7 @@ impl ProxyManager {
         }
     }
 
+    // @spec FETCHING-005
     /// Returns the next proxy in round-robin fashion.
     pub fn get_next_proxy(&self) -> Option<Proxy> {
         let mut index = self.index.write().ok()?;
@@ -108,6 +111,7 @@ mod tests {
         }
     }
 
+    // @spec FETCHING-015
     #[test]
     fn puts_credentials_between_the_scheme_and_the_host() {
         assert_eq!(
@@ -116,11 +120,13 @@ mod tests {
         );
     }
 
+    // @spec FETCHING-015
     #[test]
     fn omits_the_userinfo_when_there_are_no_credentials() {
         assert_eq!(proxy(None, None).to_proxy_url(), "http://45.3.38.37:3129");
     }
 
+    // @spec FETCHING-015
     /// The sidecar takes the string verbatim, so a duplicate scheme is silent.
     #[test]
     fn writes_the_scheme_exactly_once() {

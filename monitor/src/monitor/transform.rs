@@ -118,6 +118,7 @@ mod tests {
         }
     }
 
+    // @spec ROUTING-040
     #[test]
     fn carries_the_offer_identity_across() {
         let product = Product::from(offer(vec![item(None, 9.99, None)], None));
@@ -128,6 +129,7 @@ mod tests {
         assert!(!product.out_of_stock);
     }
 
+    // @spec ROUTING-002
     #[test]
     fn maps_sold_out_to_out_of_stock() {
         let mut woot_offer = offer(vec![item(None, 9.99, None)], None);
@@ -136,11 +138,13 @@ mod tests {
         assert!(Product::from(woot_offer).out_of_stock);
     }
 
+    // @spec ROUTING-043
     #[test]
     fn treats_missing_photos_as_none_rather_than_failing() {
         assert!(Product::from(offer(vec![], None)).photos.is_empty());
     }
 
+    // @spec ROUTING-043
     #[test]
     fn keeps_photos_in_order() {
         let photos = vec![
@@ -157,6 +161,7 @@ mod tests {
         assert_eq!(product.photos[1].url, "https://img/b.jpg");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn reads_condition_from_the_first_item() {
         let attrs = Some(vec![attr("Condition", "Refurbished")]);
@@ -165,6 +170,7 @@ mod tests {
         assert_eq!(product.condition, "Refurbished");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn matches_the_condition_key_case_insensitively() {
         let attrs = Some(vec![attr("CONDITION", "Scratch and Dent")]);
@@ -173,6 +179,7 @@ mod tests {
         assert_eq!(product.condition, "Scratch and Dent");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn falls_back_to_unknown_condition() {
         let attrs = Some(vec![attr("Color", "Black")]);
@@ -181,6 +188,7 @@ mod tests {
         assert_eq!(product.condition, "Unknown");
     }
 
+    // @spec ROUTING-040
     #[test]
     fn falls_back_to_unknown_condition_when_there_are_no_items() {
         let product = Product::from(offer(vec![], None));
@@ -190,6 +198,7 @@ mod tests {
         assert_eq!(product.sale_price, None);
     }
 
+    // @spec ROUTING-042
     #[test]
     fn drops_a_new_condition_from_the_variant_label() {
         let attrs = Some(vec![attr("Condition", "New")]);
@@ -199,6 +208,7 @@ mod tests {
         assert_eq!(product.variants[0].attrs, None);
     }
 
+    // @spec ROUTING-042
     #[test]
     fn keeps_a_non_new_condition_in_the_variant_label() {
         let attrs = Some(vec![attr("Condition", "Refurbished")]);
@@ -207,6 +217,7 @@ mod tests {
         assert_eq!(product.variants[0].attrs.as_deref(), Some("Refurbished"));
     }
 
+    // @spec ROUTING-042
     #[test]
     fn joins_multiple_attributes_with_a_slash() {
         let attrs = Some(vec![
@@ -219,6 +230,7 @@ mod tests {
         assert_eq!(product.variants[0].attrs.as_deref(), Some("Black / 2m"));
     }
 
+    // @spec ROUTING-042
     #[test]
     fn labels_a_variant_with_no_attributes_as_none() {
         let product = Product::from(offer(vec![item(None, 9.99, None)], None));
@@ -226,6 +238,7 @@ mod tests {
         assert_eq!(product.variants[0].attrs, None);
     }
 
+    // @spec ROUTING-044
     #[test]
     fn converts_dollars_to_whole_cents() {
         let product = Product::from(offer(vec![item(Some(24.99), 12.50, None)], None));
@@ -234,6 +247,7 @@ mod tests {
         assert_eq!(product.variants[0].sale_price, Some(1250));
     }
 
+    // @spec ROUTING-040
     #[test]
     fn lifts_the_first_item_prices_onto_the_product() {
         let items = vec![item(Some(24.99), 12.50, None), item(Some(9.99), 5.00, None)];
@@ -243,6 +257,7 @@ mod tests {
         assert_eq!(product.sale_price, Some(1250));
     }
 
+    // @spec ROUTING-042
     #[test]
     fn builds_one_variant_per_item() {
         let items = vec![item(None, 9.99, None), item(None, 5.00, None)];
@@ -250,6 +265,7 @@ mod tests {
         assert_eq!(Product::from(offer(items, None)).variants.len(), 2);
     }
 
+    // @spec ROUTING-044
     #[test]
     fn rounds_prices_that_float_math_lands_just_under() {
         // $19.99 * 100.0 is 1998.9999999999998 in f64; truncating loses a cent.
@@ -259,6 +275,7 @@ mod tests {
         assert_eq!(product.variants[0].list_price, Some(115));
     }
 
+    // @spec ROUTING-044
     #[test]
     fn keeps_prices_above_the_old_u16_ceiling() {
         // 65535 cents is $655.35, which u16 used to clamp everything down to.
@@ -268,6 +285,7 @@ mod tests {
         assert_eq!(product.variants[0].sale_price, Some(70000));
     }
 
+    // @spec ROUTING-044
     #[test]
     fn rounds_a_half_cent_up() {
         let product = Product::from(offer(vec![item(None, 0.125, None)], None));
