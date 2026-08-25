@@ -90,6 +90,7 @@ impl DiscordWebhook {
         Self { proxy_manager, url }
     }
 
+    // @spec ROUTING-031
     pub async fn send(&self, payload: WebhookPayload) -> Result<(), reqwest::Error> {
         let WebhookPayload::Discord(discord) = payload;
 

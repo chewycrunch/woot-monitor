@@ -22,6 +22,7 @@ static ASIN: LazyLock<Regex> = LazyLock::new(|| {
         .expect("invalid Asin pattern")
 });
 
+// @spec FETCHING-020, FETCHING-022, FETCHING-023
 /// Extracts the total review count, or `None` if the page does not carry one.
 pub fn total_reviews(html: &str) -> Option<u32> {
     TOTAL_REVIEWS
@@ -32,6 +33,7 @@ pub fn total_reviews(html: &str) -> Option<u32> {
         .ok()
 }
 
+// @spec FETCHING-020, FETCHING-021, FETCHING-022, FETCHING-023
 /// Extracts the Amazon ASIN, or `None` if the page does not carry one.
 pub fn asin(html: &str) -> Option<String> {
     Some(ASIN.captures(html)?.get(1)?.as_str().to_string())
@@ -41,24 +43,28 @@ pub fn asin(html: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    // @spec FETCHING-020
     #[test]
     fn reads_total_reviews_from_decoded_html() {
         let html = r#"<script>var d = {"TotalReviewCount":1234,"Rating":4.5};</script>"#;
         assert_eq!(total_reviews(html), Some(1234));
     }
 
+    // @spec FETCHING-022
     #[test]
     fn reads_total_reviews_from_json_escaped_html() {
         let html = r#"{"body":"<script>var d = {\"TotalReviewCount\":1234};</script>"}"#;
         assert_eq!(total_reviews(html), Some(1234));
     }
 
+    // @spec FETCHING-020
     #[test]
     fn tolerates_whitespace_around_the_review_count() {
         let html = r#"{"TotalReviewCount" : 42}"#;
         assert_eq!(total_reviews(html), Some(42));
     }
 
+    // @spec FETCHING-023
     #[test]
     fn returns_no_review_count_when_absent() {
         assert_eq!(
@@ -67,45 +73,53 @@ mod tests {
         );
     }
 
+    // @spec FETCHING-023
     #[test]
     fn returns_no_review_count_when_not_a_number() {
         assert_eq!(total_reviews(r#"{"TotalReviewCount":"many"}"#), None);
     }
 
+    // @spec FETCHING-020
     #[test]
     fn reads_asin_from_decoded_html() {
         let html = r#"<script>RatingSummaryData = [{"Asin":"B08N5WRWNW","Rating":4}];</script>"#;
         assert_eq!(asin(html), Some("B08N5WRWNW".to_string()));
     }
 
+    // @spec FETCHING-022
     #[test]
     fn reads_asin_from_json_escaped_html() {
         let html = r#"{"body":"RatingSummaryData = [{\"Asin\":\"B08N5WRWNW\"}]"}"#;
         assert_eq!(asin(html), Some("B08N5WRWNW".to_string()));
     }
 
+    // @spec FETCHING-020
     #[test]
     fn finds_asin_across_newlines() {
         let html = "RatingSummaryData = [\n  {\n    \"Asin\": \"B0123ABCDE\"\n  }\n]";
         assert_eq!(asin(html), Some("B0123ABCDE".to_string()));
     }
 
+    // @spec FETCHING-021
     #[test]
     fn ignores_an_asin_that_precedes_the_rating_summary() {
         let html = r#"{"Asin":"AAAAAAAAAA"} ... RatingSummaryData = [{"Asin":"B08N5WRWNW"}]"#;
         assert_eq!(asin(html), Some("B08N5WRWNW".to_string()));
     }
 
+    // @spec FETCHING-021
     #[test]
     fn returns_no_asin_without_the_rating_summary_anchor() {
         assert_eq!(asin(r#"{"Asin":"B08N5WRWNW"}"#), None);
     }
 
+    // @spec FETCHING-023
     #[test]
     fn returns_no_asin_when_the_value_is_not_ten_characters() {
         assert_eq!(asin(r#"RatingSummaryData = [{"Asin":"B08N5"}]"#), None);
     }
 
+    // @spec FETCHING-023
     #[test]
     fn returns_no_asin_when_absent() {
         assert_eq!(asin("<html><body>no asin here</body></html>"), None);

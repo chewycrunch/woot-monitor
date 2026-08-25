@@ -61,6 +61,7 @@ impl Monitor {
         }
     }
 
+    // @spec DETECTION-011, DETECTION-012, DETECTION-013
     /// Starts the Woot Monitor instance.
     /// This function initializes the monitor, then begins monitoring for new products.
     pub async fn start(&mut self) {
@@ -90,6 +91,7 @@ impl Monitor {
         self.run().await;
     }
 
+    // @spec DETECTION-010
     /// Intializes the monitor by loading in all products from Woot.
     pub async fn initialize(&mut self) -> Result<u32, Box<dyn std::error::Error>> {
         info!("Initializing Monitor | Adding initial offers...");
@@ -107,6 +109,7 @@ impl Monitor {
         Ok(self.products.get_count() as u32)
     }
 
+    // @spec DETECTION-040, DETECTION-041
     /// Tracks the newest StartDate seen, which bounds how deep a poll pages.
     fn advance_newest(&mut self, product: &Product) {
         if self
@@ -117,6 +120,7 @@ impl Monitor {
         }
     }
 
+    // @spec DETECTION-023, DETECTION-030, DETECTION-031, DETECTION-032, DETECTION-033, DETECTION-050, DETECTION-051, ROUTING-001, ROUTING-002
     /// Monitors Woot for new products.
     pub async fn run(&mut self) {
         loop {
@@ -162,6 +166,7 @@ impl Monitor {
         }
     }
 
+    // @spec FETCHING-024
     /// Fetches the details of a specific offer, including ASIN and total reviews.
     pub async fn fetch_offer_details(
         &self,
@@ -214,6 +219,7 @@ impl Monitor {
 mod tests {
     use super::*;
 
+    // @spec DETECTION-011
     #[test]
     fn doubles_the_wait_on_each_failure() {
         assert_eq!(
@@ -226,12 +232,14 @@ mod tests {
         );
     }
 
+    // @spec DETECTION-011
     #[test]
     fn never_waits_longer_than_the_ceiling() {
         assert_eq!(next_backoff(Duration::from_secs(40)), INIT_RETRY_MAX);
         assert_eq!(next_backoff(INIT_RETRY_MAX), INIT_RETRY_MAX);
     }
 
+    // @spec DETECTION-011
     /// Retries are unbounded, so the wait must converge.
     #[test]
     fn converges_on_the_ceiling_from_the_initial_wait() {

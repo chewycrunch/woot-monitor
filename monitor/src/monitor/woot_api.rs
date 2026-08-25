@@ -151,6 +151,7 @@ impl WootApi {
         }
     }
 
+    // @spec DETECTION-001, DETECTION-002, DETECTION-004, DETECTION-005
     /// Fetches every available offer, paging until Woot returns a short page.
     pub async fn fetch_all_offers(&self) -> Result<Vec<Product>, Box<dyn std::error::Error>> {
         let mut all_products = Vec::new();
@@ -200,11 +201,13 @@ impl WootApi {
         Ok(all_products)
     }
 
+    // @spec DETECTION-003
     /// Depth the page after `skip` would request, measured as `Skip + Limit`.
     fn next_page_depth(skip: u8) -> u16 {
         (u16::from(skip) + 1) * PAGE_SIZE + PAGE_SIZE
     }
 
+    // @spec DETECTION-021, DETECTION-022
     /// Whether a page reached past `cutoff`. Strictly-older, never equal: offers
     /// sharing a timestamp can straddle a page boundary, so stopping on equality
     /// would skip the rest of that batch.
@@ -212,6 +215,7 @@ impl WootApi {
         oldest_on_page.is_some_and(|oldest| oldest < cutoff)
     }
 
+    // @spec DETECTION-020, DETECTION-024, DETECTION-025
     /// Offers listed at or after `since`, less [`LOOKBACK`]. Pages only as deep
     /// as that cutoff, which `NewestFirst` makes a contiguous prefix.
     pub async fn fetch_offers_since(
@@ -429,6 +433,7 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
 
+    // @spec DETECTION-003
     /// The limit is inclusive, so a naive `>=` would drop the last valid page.
     #[test]
     fn allows_the_page_that_lands_exactly_on_the_depth_limit() {
@@ -436,11 +441,13 @@ mod tests {
         assert!(WootApi::next_page_depth(48) <= MAX_SEARCH_DEPTH);
     }
 
+    // @spec DETECTION-003
     #[test]
     fn stops_before_the_first_page_that_would_exceed_the_depth_limit() {
         assert!(WootApi::next_page_depth(49) > MAX_SEARCH_DEPTH);
     }
 
+    // @spec DETECTION-003
     /// Paging should reach exactly `MAX_SEARCH_DEPTH` offers.
     #[test]
     fn reaches_the_depth_limit_exactly() {
@@ -460,11 +467,13 @@ mod tests {
             .unwrap()
     }
 
+    // @spec DETECTION-021
     #[test]
     fn stops_once_a_page_reaches_past_the_cutoff() {
         assert!(WootApi::page_passed_cutoff(Some(at(3)), at(5)));
     }
 
+    // @spec DETECTION-022
     /// Woot lists in batches sharing one timestamp, and a batch can span pages.
     /// Stopping on equality would skip the remainder of that batch, which is
     /// where a new offer can sit.
@@ -473,11 +482,13 @@ mod tests {
         assert!(!WootApi::page_passed_cutoff(Some(at(5)), at(5)));
     }
 
+    // @spec DETECTION-021
     #[test]
     fn keeps_paging_while_the_page_is_newer_than_the_cutoff() {
         assert!(!WootApi::page_passed_cutoff(Some(at(9)), at(5)));
     }
 
+    // @spec DETECTION-021
     #[test]
     fn an_empty_page_does_not_count_as_reaching_the_cutoff() {
         assert!(!WootApi::page_passed_cutoff(None, at(5)));

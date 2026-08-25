@@ -8,6 +8,7 @@ use std::sync::Arc;
 /// Reviews an offer needs, alongside an ASIN, to count as verified.
 pub const MIN_REVIEWS: u32 = 200;
 
+// @spec ROUTING-023, ROUTING-024
 /// Reduces text to its lowercased words, space-delimited and space-padded, so
 /// `contains` matches whole words only: " nest " does not occur in " honest ",
 /// while a multi-word keyword like "instant pot" survives as one string.
@@ -48,6 +49,7 @@ impl WebhookManager {
         }
     }
 
+    // @spec ROUTING-025, ROUTING-033, CONFIG-013
     pub fn register_from_configs(&mut self, configs: Vec<WebhookConfig>) {
         for cfg in configs {
             if let Some(url) = &cfg.unverified_url {
@@ -80,6 +82,7 @@ impl WebhookManager {
         }
     }
 
+    // @spec ROUTING-010, ROUTING-011, ROUTING-012, ROUTING-013, ROUTING-020, ROUTING-021, ROUTING-022, ROUTING-026, ROUTING-030, ROUTING-032, ROUTING-033
     pub async fn broadcast(&self, payload: WebhookPayload, item_info: ItemInfo) {
         // Exclusive: an offer is one or the other, never both. A failed details
         // scrape yields no ASIN, so it lands as unverified rather than erroring.
@@ -127,12 +130,14 @@ mod tests {
         normalize(title).contains(&normalize(keyword))
     }
 
+    // @spec ROUTING-023
     #[test]
     fn matches_a_single_word_anywhere_in_the_title() {
         assert!(matches("ninja", "Ninja Professional Blender"));
         assert!(matches("ninja", "Refurbished Ninja"));
     }
 
+    // @spec ROUTING-023
     /// The previous matcher split the title into whole words and looked each
     /// keyword up, so every multi-word entry in a config could never fire.
     #[test]
@@ -141,6 +146,7 @@ mod tests {
         assert!(matches("6700 xt", "AMD Radeon RX 6700 XT 12GB"));
     }
 
+    // @spec ROUTING-024
     /// Punctuation is a word break on both sides, not a deletion, so "g.skill"
     /// and "gskill" stay distinct tokens. That is why a config wanting both
     /// spellings has to list both, as this one does.
@@ -154,11 +160,13 @@ mod tests {
         assert!(!matches("gskill", "G.Skill Trident Z"));
     }
 
+    // @spec ROUTING-023
     #[test]
     fn ignores_case_on_both_sides() {
         assert!(matches("DEWALT", "dewalt drill"));
     }
 
+    // @spec ROUTING-023
     /// Substring matching without word boundaries would fire "nest" on
     /// "Honest", which is why the normalized forms are space-padded.
     #[test]
@@ -167,11 +175,13 @@ mod tests {
         assert!(!matches("shark", "Sharkskin Wallet"));
     }
 
+    // @spec ROUTING-023
     #[test]
     fn does_not_match_a_different_word() {
         assert!(!matches("dyson", "Shark Vacuum"));
     }
 
+    // @spec ROUTING-025
     /// A keyword of only punctuation normalizes to " ", which every title
     /// contains, so registration drops those rather than matching everything.
     #[test]
