@@ -6,10 +6,10 @@ pub mod transform;
 pub mod woot_api;
 
 // General
-use std::{sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc, time::Duration, time::SystemTime};
 
 // Utils
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 // Project
 use self::product::{Product, Products};
@@ -18,6 +18,7 @@ use self::woot_api::WootApi;
 use chrono::{DateTime, Utc};
 
 use crate::config::Config;
+use crate::liveness;
 use crate::proxy::ProxyManager;
 use crate::webhook::{ItemInfo, WebhookManager, WebhookPayload};
 
@@ -97,6 +98,7 @@ impl Monitor {
         info!("Initializing Monitor | Adding initial offers...");
 
         let all_products = self.woot_api.fetch_all_offers().await?;
+        self.record_liveness();
         let all_products_len = all_products.len();
 
         for product in all_products {
@@ -107,6 +109,18 @@ impl Monitor {
         info!(count = all_products_len, "Added offers");
 
         Ok(self.products.get_count() as u32)
+    }
+
+    // @spec DETECTION-060, DETECTION-062, DETECTION-065
+    /// Records the read that just succeeded. A failed write leaves the signal
+    /// to go stale, which reports unhealthy — honest enough to warn and carry
+    /// on rather than interrupt the poll.
+    fn record_liveness(&self) {
+        let path = Path::new(liveness::SIGNAL_PATH);
+
+        if let Err(e) = liveness::record(path, SystemTime::now(), self.delay) {
+            warn!(error = %e, path = liveness::SIGNAL_PATH, "Failed to record liveness signal");
+        }
     }
 
     // @spec DETECTION-040, DETECTION-041
@@ -133,6 +147,7 @@ impl Monitor {
 
             match fetched {
                 Ok(products) => {
+                    self.record_liveness();
                     info!(count = products.len(), "Fetched offers");
 
                     for product in products {

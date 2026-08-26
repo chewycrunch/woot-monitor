@@ -54,7 +54,7 @@ An unknown key in the file is ignored rather than rejected, which is what makes 
 
 ## Deployment shape
 
-The monitor image declares a health check reading the liveness timestamp that detection emits, with its staleness margin derived from the configured poll interval — so a deployment that changes the interval does not need to change the check. The timestamp's location is part of the image's contract rather than a configurable value.
+The monitor image declares a health check that invokes the monitor binary in a health mode. That mode reads the liveness signal detection emits and nothing else — no configuration file, no environment, no proxy list — because the staleness margin it needs is recorded in the signal itself. A deployment that changes the poll interval therefore needs no change to the check, and no check can fail for a reason unrelated to whether polling is working. The signal's location is part of the image's contract rather than a configurable value.
 
 The published images contain no configuration. Both the configuration file and the proxy list are supplied at runtime, which is what allows one image to serve every deployment. A deployment that forgets the configuration mount fails immediately and loudly; one that forgets the proxy mount runs unproxied, visible only as a count at startup.
 
@@ -64,6 +64,7 @@ The published images contain no configuration. Both the configuration file and t
 |---|---|---|---|
 | File format | TOML | YAML; JSON | JSON has no comments, and a hand-edited config needs them. The maintained YAML libraries are forks of an archived crate. |
 | Layering | Environment over file over default | File only; environment only | Structured values like a keyword list are unwieldy in environment variables; deployment values are unwieldy in a file that is otherwise identical everywhere. |
+| Health check command | The monitor binary in a health mode | A shell one-liner over the signal file; an HTTP endpoint the check polls | A shell check puts the staleness arithmetic in a Dockerfile string, where no test in the crate can reach it. An endpoint adds a listening socket to a process that otherwise only makes outbound requests. |
 | Config in the image | Never baked | Bake a default and override by mount | A baked file means an image carries one deployment's endpoints, and a missing mount silently runs against them instead of failing. |
 | Bad config | Stop the process | Warn and continue with defaults | Continuing means notifications silently stop; no retry fixes an absent file. |
 | Malformed endpoint | Rejected at load | Accepted, failing at delivery | A typo caught at deploy time is loud and immediate; the same typo caught at delivery is silent and permanent. |

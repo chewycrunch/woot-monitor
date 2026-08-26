@@ -1,14 +1,32 @@
+use std::path::Path;
 use std::sync::Arc;
+use std::time::SystemTime;
 use tracing::info;
 use woot_monitor::config::Config;
+use woot_monitor::liveness;
 use woot_monitor::logging;
 use woot_monitor::monitor::Monitor;
 use woot_monitor::proxy::ProxyManager;
 use woot_monitor::webhook::WebhookManager;
 
+/// Invoked by the image's health check, never by an operator.
+const HEALTH_FLAG: &str = "--health";
+
+// @spec CONFIG-041, CONFIG-042, DETECTION-063, DETECTION-064
+/// Reports liveness from the signal file alone: no config, no proxies, no log
+/// setup. Exits 0 healthy, 1 otherwise, as a container health check expects.
+fn health() -> ! {
+    let fresh = liveness::check(Path::new(liveness::SIGNAL_PATH), SystemTime::now());
+    std::process::exit(i32::from(!fresh));
+}
+
 // @spec CONFIG-004, CONFIG-020, CONFIG-030, FETCHING-004, FETCHING-006
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().nth(1).as_deref() == Some(HEALTH_FLAG) {
+        health();
+    }
+
     dotenvy::dotenv().ok();
     logging::init();
 

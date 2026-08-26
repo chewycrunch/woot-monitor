@@ -1,13 +1,13 @@
 # Specs without tests
 
-23 of the 78 implemented specs are verified by a test. The other 55 are cited only by the code that realizes them.
+27 of the 86 implemented specs are verified by a test. The other 59 are cited only by the code that realizes them.
 
 | Segment | Implemented | Tested | Untested |
 |---|---|---|---|
-| detection | 23 | 4 | 19 |
+| detection | 29 | 8 | 21 |
 | routing | 22 | 9 | 13 |
 | fetching | 19 | 5 | 14 |
-| config | 14 | 5 | 9 |
+| config | 16 | 5 | 11 |
 
 This is a snapshot. To recheck, compare the `**ID**` entries in each `docs/intent/*/‌*-specs.md` against the `// @spec` annotations sitting above `#[test]` functions in `monitor/src`.
 
@@ -51,8 +51,8 @@ What is sent to the sidecar, that the session is released afterwards, and that a
 **Log-carried behaviour** — `DETECTION-012`, `DETECTION-031`, `DETECTION-050`, `DETECTION-051`, `CONFIG-030`, `FETCHING-004`, `FETCHING-006`
 These specify what the system reports rather than what it computes. Verifying them means capturing tracing output — a smaller seam than the others, but still deliberate.
 
-**Outside the unit-test boundary** — `CONFIG-001`, `CONFIG-004`, `CONFIG-040`
-Reading from a fixed path, loading a local environment file at startup, and the published image containing no configuration. Properties of the process and the image, verifiable by starting a container rather than from this crate.
+**Outside the unit-test boundary** — `CONFIG-001`, `CONFIG-004`, `CONFIG-040`, `CONFIG-041`, `CONFIG-042`, `DETECTION-061`, `DETECTION-062`
+Reading from a fixed path, loading a local environment file at startup, the published image containing no configuration, the image declaring a health check, and the liveness signal's directory being writable by the runtime user. Properties of the process and the image, verifiable by starting a container rather than from this crate. `DETECTION-062` is the odd one out — a negative, satisfied by where the recording call sits rather than by anything a test can assert.
 
 ## Suggested order
 
@@ -64,10 +64,8 @@ Log-carried and image-level behaviour is worth deferring until those are done; i
 
 ## Separately: specs with no implementation
 
-Nine specs describe intent the code does not yet have. These are gaps in the arrow rather than in its testing, and are marked `[ ]` in their spec files.
+Three specs describe intent the code does not yet have. These are gaps in the arrow rather than in its testing, and are marked `[ ]` in their spec files.
 
-- `DETECTION-060`–`DETECTION-064` — the liveness timestamp and the monitor image's health check
 - `CONFIG-005` — an empty environment variable should mean unset; it is currently taken literally
 - `CONFIG-023` — a malformed webhook endpoint should be rejected at load rather than failing on every delivery
-- `CONFIG-041` — the monitor image should declare a health check
 - `FETCHING-025` — offer pages should not be requested when no endpoint is configured to consume the result

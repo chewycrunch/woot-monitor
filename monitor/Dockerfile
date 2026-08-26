@@ -41,6 +41,11 @@ LABEL org.opencontainers.image.source=https://github.com/chewycrunch/woot-monito
 RUN addgroup -S appuser && adduser -S appuser -G appuser
 WORKDIR /app
 
+# @spec DETECTION-061
+# /app is root-owned and holds the read-only config mount, so the liveness
+# signal gets its own directory that the runtime user can write.
+RUN mkdir -p /run/woot-monitor && chown appuser:appuser /run/woot-monitor
+
 # Install TLS certs for HTTPS
 RUN apk add --no-cache ca-certificates
 
@@ -52,6 +57,13 @@ COPY --from=builder /woot-monitor /usr/local/bin/woot-monitor
 # credentials), so they are bind-mounted at run time instead — see the README.
 # A missing config.toml aborts at startup rather than running against a stale or
 # placeholder one.
+
+# @spec CONFIG-041
+# Reads the liveness signal and nothing else — the staleness margin travels in
+# the signal, so changing WOOT_DELAY_MS needs no change here. The start period
+# covers the full-catalogue read at startup, reported as "starting" until it lands.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+  CMD ["/usr/local/bin/woot-monitor", "--health"]
 
 USER appuser
 CMD ["/usr/local/bin/woot-monitor"]
