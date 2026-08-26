@@ -6,7 +6,7 @@
 - [x] **CONFIG-002**: The system shall allow any single-valued configuration setting to be overridden by an environment variable carrying the project's prefix followed by the setting's name.
 - [x] **CONFIG-006**: The system shall take the list of webhook entries from the configuration file only.
 - [x] **CONFIG-003**: The system shall resolve each value from the environment first, then the configuration file, then a compiled-in default.
-- [x] **CONFIG-004**: On startup, the system shall load a local environment file into its environment before resolving any configuration value.
+- [x] **CONFIG-004**: When starting to poll, the system shall load a local environment file into its environment before resolving any configuration value.
 - [ ] **CONFIG-005**: The system shall treat an environment variable set to an empty string as unset.
 
 ## Required and optional values
@@ -30,4 +30,5 @@
 ## Deployment
 
 - [x] **CONFIG-040**: The published monitor image shall contain no configuration file and no proxy list.
-- [ ] **CONFIG-041**: The published monitor image shall declare a health check whose staleness margin is derived from the configured poll interval.
+- [x] **CONFIG-041**: The published monitor image shall declare a health check that reports the monitor unhealthy once its liveness signal is stale.
+- [x] **CONFIG-042**: The system shall report liveness without reading its configuration file, its environment, or its proxy list.

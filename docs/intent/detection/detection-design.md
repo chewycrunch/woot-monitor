@@ -57,7 +57,9 @@ The signal is consumed as a container health check, which fails once the timesta
 
 Success means a completed read, not a completed notification. Notification failures are per-channel and tolerated by design, and treating them as liveness failures would report the system as broken when it is doing its job.
 
-The timestamp is written where the unprivileged runtime user can write, which is not the working directory the configuration is mounted into.
+The timestamp is written to `/run/woot-monitor/alive`, a location the unprivileged runtime user can write and deliberately not the working directory the configuration is mounted into.
+
+The staleness margin is recorded beside the timestamp rather than recomputed when the check runs. The monitor has already resolved the poll interval through the configuration layering, so the derivation happens once, in the only place that knows the answer, and the check needs nothing but the signal itself.
 
 Reporting unhealthy is not the same as restarting. A container restart policy triggers on exit, and this design deliberately does not exit — so an unhealthy monitor stays up until an operator or orchestrator acts on the signal. That is the intended division: the system reports its own state honestly and does not decide what should be done about it.
 
@@ -76,6 +78,7 @@ An offer is new when its identifier has not been recorded before. Only first app
 | Startup failure | Retry indefinitely with capped backoff | Exit and let the restart policy handle it; give up after N attempts | The steady-state loop already tolerates the same failure. Exiting turns a blip into a restart loop that is invisible in container status; an attempt limit would exit on exactly the failures a restart cannot fix either. |
 | Reporting a stalled monitor | Liveness timestamp read by a container health check | Exit after N failed attempts so restarts are visible | Exiting reports only a failed startup, while the steady-state loop can stall just as silently. A liveness signal covers both, and keeps the log continuous where restarting resets it. |
 | Notification lost to a crash | Accepted; record before notify | Record after notify | Recording first risks losing one notification to a crash; notifying first risks re-sending it on every poll until delivery succeeds. |
+| Margin derivation | Recorded beside the timestamp by the writer | Recomputed by the health check from the configuration | Re-reading the configuration on each check adds a failure mode unrelated to polling: configuration that has become unreadable would report as a dead monitor. |
 | Liveness trigger | A successful catalogue read | A successful notification; a completed loop iteration | Notification failures are per-channel and tolerated; treating them as liveness failures would report a working system as broken. |
 | Seen-set | In-memory, no eviction | Persistent store; bounded LRU | Catalogue turnover makes a post-downtime backlog mostly stale, and no eviction means an offer re-entering the window is not re-reported. [inferred] |
 | Page size | 200 offers | Larger or smaller pages | Interacts with the depth ceiling: the page size divides 10,000 evenly, so paging lands exactly on the ceiling. [inferred] |

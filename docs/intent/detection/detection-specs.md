@@ -43,8 +43,9 @@
 
 ## Liveness
 
-- [ ] **DETECTION-060**: When a catalogue read completes successfully, the system shall record a liveness timestamp.
-- [ ] **DETECTION-061**: The system shall record the liveness timestamp at a location writable by the unprivileged user the monitor runs as.
-- [ ] **DETECTION-062**: The system shall not record a liveness timestamp on the outcome of notification delivery.
-- [ ] **DETECTION-063**: While the liveness timestamp is older than a margin derived from the configured poll interval, the monitor's container shall report itself unhealthy.
-- [ ] **DETECTION-064**: While no catalogue read has yet succeeded, the monitor's container shall not report itself healthy.
+- [x] **DETECTION-060**: When a catalogue read completes successfully, the system shall record a liveness timestamp.
+- [x] **DETECTION-061**: The system shall record the liveness timestamp at a location writable by the unprivileged user the monitor runs as.
+- [x] **DETECTION-062**: The system shall not record a liveness timestamp on the outcome of notification delivery.
+- [x] **DETECTION-065**: When recording a liveness timestamp, the system shall record beside it the staleness margin derived from the configured poll interval.
+- [x] **DETECTION-063**: While the liveness timestamp is older than the staleness margin recorded beside it, the monitor's container shall report itself unhealthy.
+- [x] **DETECTION-064**: While no catalogue read has yet succeeded, the monitor's container shall not report itself healthy.
