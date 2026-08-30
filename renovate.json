@@ -1,31 +1,111 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommits"],
+  "timezone": "America/New_York",
+  "schedule": ["after 8am and before 10am every weekday"],
+  "minimumReleaseAge": "3 days",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 5,
+  "rangeStrategy": "bump",
+  "labels": ["dependencies"],
+  "enabledManagers": ["cargo", "dockerfile", "docker-compose", "github-actions", "custom.regex"],
+  "lockFileMaintenance": {
+    "description": "Cargo.lock is committed and pins every transitive crate; nothing else refreshes them",
+    "enabled": true,
+    "schedule": ["after 8am and before 10am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null,
+    "labels": ["dependencies", "security"]
+  },
+  "osvVulnerabilityAlerts": true,
   "customManagers": [
     {
       "customType": "regex",
       "description": "Bump the pinned tls-client-api release, which is a plain Docker ARG no standard manager sees",
-      "managerFilePatterns": [
-        "tls-client/Dockerfile"
-      ],
-      "matchStrings": [
-        "ARG TLS_CLIENT_API_VERSION=(?<currentValue>v\\S+)"
-      ],
+      "managerFilePatterns": ["tls-client/Dockerfile"],
+      "matchStrings": ["ARG TLS_CLIENT_API_VERSION=(?<currentValue>v\\S+)"],
       "datasourceTemplate": "github-releases",
       "depNameTemplate": "bogdanfinn/tls-client-api"
     }
   ],
   "packageRules": [
     {
-      "description": "Our own images are built from this repo, not consumed from a registry",
-      "matchManagers": [
-        "docker-compose"
-      ],
+      "description": "Separate major updates from minor/patch so breaking changes land alone",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["major"]
+    },
+    {
+      "description": "Under Cargo's caret rules a 0.x minor bump is breaking, but Renovate types it as minor",
+      "matchManagers": ["cargo"],
+      "matchCurrentVersion": "<1.0.0",
+      "matchUpdateTypes": ["minor"],
+      "addLabels": ["breaking"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "serde and its format crates share a derive macro and must move together",
+      "groupName": "serde",
+      "groupSlug": "serde",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["serde", "serde_json", "serde_derive", "serde_*"]
+    },
+    {
+      "description": "Async runtime — tokio, its ecosystem crates, and the trait macro built on it",
+      "groupName": "tokio & async",
+      "groupSlug": "tokio",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["tokio", "tokio-*", "async-trait", "futures", "futures-*"]
+    },
+    {
+      "description": "Subscriber and core move in lockstep; a mismatch silently drops spans",
+      "groupName": "tracing",
+      "groupSlug": "tracing",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["tracing", "tracing-*"]
+    },
+    {
+      "description": "HTTP/TLS stack — reqwest pins rustls and hyper as peers, so bump the set at once",
+      "groupName": "reqwest & TLS stack",
+      "groupSlug": "reqwest",
+      "matchManagers": ["cargo"],
       "matchPackageNames": [
-        "ghcr.io/chewycrunch/woot-monitor/**"
-      ],
+        "reqwest",
+        "hyper",
+        "hyper-*",
+        "rustls",
+        "rustls-*",
+        "tokio-rustls",
+        "webpki-roots",
+        "url",
+        "urlencoding"
+      ]
+    },
+    {
+      "description": "Config loading — the file layer and the .env layer feed the same settings struct",
+      "groupName": "config & env",
+      "groupSlug": "config",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["config", "dotenvy"]
+    },
+    {
+      "description": "Base images for the two build stages",
+      "groupName": "Docker base images",
+      "groupSlug": "docker-base",
+      "matchManagers": ["dockerfile"],
+      "matchPackageNames": ["golang", "alpine", "clux/muslrust"]
+    },
+    {
+      "description": "GitHub Actions used across all workflows",
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "Our own images are built from this repo, not consumed from a registry",
+      "matchPackageNames": ["ghcr.io/chewycrunch/woot-monitor/**"],
       "enabled": false
     }
   ]
