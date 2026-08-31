@@ -10,8 +10,8 @@ edition = "2021"
 mod_module_files = "warn"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls","json"] }
 rand = "0.9.1"
 
