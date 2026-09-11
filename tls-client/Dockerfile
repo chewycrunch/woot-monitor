@@ -1,6 +1,6 @@
 # Builds bogdanfinn/tls-client-api from upstream github
 # https://github.com/bogdanfinn/tls-client-api/releases
-ARG TLS_CLIENT_API_VERSION=v1.15.1
+ARG TLS_CLIENT_API_VERSION=v1.16.0
 
 # Runs on the host's own architecture and cross-compiles to the target, so a
 # multi-arch build costs one native Go build per arch rather than an emulated one.
