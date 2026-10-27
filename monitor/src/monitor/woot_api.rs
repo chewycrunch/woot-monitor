@@ -151,7 +151,7 @@ impl WootApi {
         }
     }
 
-    // @spec DETECTION-001, DETECTION-002, DETECTION-004, DETECTION-005
+    // @spec DETECTION-002, DETECTION-004, DETECTION-005
     /// Fetches every available offer, paging until Woot returns a short page.
     pub async fn fetch_all_offers(&self) -> Result<Vec<Product>, Box<dyn std::error::Error>> {
         let mut all_products = Vec::new();
@@ -283,45 +283,11 @@ impl WootApi {
     ) -> Result<WootResponse, Box<dyn std::error::Error>> {
         let client = self.client(|builder| builder)?;
 
-        let query = format!(
-            r#"
-                {{
-                    searchOffers(
-                        Filter: {{
-                            Categories: ["home", "tech", "pc", "tools", "sport", "grocery"],
-                            IsSoldOut: {{ exclude: true }}
-                        }},
-                        Sort: NewestFirst,
-                        Limit: {},
-                        Skip: {}
-                    ) {{
-                        TotalHits
-                        Offers {{
-                            Id
-                            SoldOut
-                            Title
-                            StartDate
-                            EndDate
-                            Items {{
-                                ListPrice
-                                SalePrice
-                                Attributes {{
-                                    Key
-                                    Value
-                                }}
-                            }}
-                            Photos {{
-                                Url
-                            }}
-                            Slug
-                        }}
-                    }}
-                }}"#,
-            limit,
-            (skip as u16) * limit
+        let url = format!(
+            "{}?query={}",
+            GRAPHQL_URL,
+            encode(&minify_graphql(&Self::search_query(limit, skip)))
         );
-
-        let url = format!("{}?query={}", GRAPHQL_URL, encode(&minify_graphql(&query)));
 
         let response = client
             .get(url)
@@ -352,6 +318,48 @@ impl WootApi {
             }),
             errors: parsed.errors,
         })
+    }
+
+    // @spec DETECTION-001, DETECTION-006, DETECTION-007
+    /// The search for one page of offers, newest first. Every category is
+    /// read; only sold-out offers are excluded.
+    fn search_query(limit: u16, skip: u8) -> String {
+        format!(
+            r#"
+                {{
+                    searchOffers(
+                        Filter: {{
+                            IsSoldOut: {{ exclude: true }}
+                        }},
+                        Sort: NewestFirst,
+                        Limit: {},
+                        Skip: {}
+                    ) {{
+                        TotalHits
+                        Offers {{
+                            Id
+                            SoldOut
+                            Title
+                            StartDate
+                            EndDate
+                            Items {{
+                                ListPrice
+                                SalePrice
+                                Attributes {{
+                                    Key
+                                    Value
+                                }}
+                            }}
+                            Photos {{
+                                Url
+                            }}
+                            Slug
+                        }}
+                    }}
+                }}"#,
+            limit,
+            (skip as u16) * limit
+        )
     }
 
     /// Builds a one-shot client bound to the next proxy in the rotation.
@@ -459,6 +467,22 @@ mod tests {
             MAX_SEARCH_DEPTH - PAGE_SIZE
         );
         assert_eq!((u16::from(last_page) + 1) * PAGE_SIZE, MAX_SEARCH_DEPTH);
+    }
+
+    // @spec DETECTION-006
+    /// An allowlist would silently drop uncategorised offers and any category
+    /// Woot adds later.
+    #[test]
+    fn searches_every_category() {
+        assert!(!WootApi::search_query(PAGE_SIZE, 0).contains("Categories"));
+    }
+
+    // @spec DETECTION-007
+    /// Left unrecorded, an offer listed sold out still notifies if it restocks.
+    #[test]
+    fn excludes_sold_out_offers_from_the_search() {
+        let query = minify_graphql(&WootApi::search_query(PAGE_SIZE, 0));
+        assert!(query.contains("IsSoldOut: { exclude: true }"));
     }
 
     fn at(hour: u32) -> DateTime<Utc> {
