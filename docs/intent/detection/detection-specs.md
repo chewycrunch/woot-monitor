@@ -7,6 +7,8 @@
 - [x] **DETECTION-003**: While paging, the system shall stop before issuing any request whose offset plus page size would exceed Woot's search depth ceiling.
 - [x] **DETECTION-004**: When a catalogue read stops at the search depth ceiling, the system shall report the number of offers read and the total the search reports as matching.
 - [x] **DETECTION-005**: When a page returns fewer offers than requested, the system shall stop paging.
+- [x] **DETECTION-006**: The system shall request offers from Woot's search API without restricting them by category.
+- [x] **DETECTION-007**: The system shall request offers from Woot's search API excluding offers that are sold out.
 
 ## Startup
 
