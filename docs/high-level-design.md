@@ -8,11 +8,11 @@ Woot also actively resists automated reading. Its offer pages reject clients who
 
 ## Approach
 
-Poll Woot's public GraphQL search on a short interval, diff each result against the offers already seen, and push anything new to Discord.
+Poll Woot's public GraphQL search across every category on a short interval, diff each result against the offers already seen, and push anything new to Discord.
 
 Three disciplines make that workable:
 
-**Newest-first polling with a cutoff.** The catalogue is larger than the API will paginate, so a full sweep is both expensive and incomplete. Sorting newest-first and reading only back to the newest offer already recorded — less a margin — turns each poll into a few requests instead of fifty.
+**Newest-first polling with a cutoff.** The catalogue is too large to read in full every few seconds and can outgrow what the API will paginate, so a full sweep is expensive and not guaranteed complete. Sorting newest-first and reading only back to the newest offer already recorded — less a margin — turns each poll into a few requests instead of fifty.
 
 **Tiered routing.** Not every new offer is worth a notification. Offers are split by whether their product identity and review count could be established, and a separately configured watchlist catches specific keywords regardless of that split.
 

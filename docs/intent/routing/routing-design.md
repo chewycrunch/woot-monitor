@@ -57,7 +57,7 @@ A notification carries what a reader needs to decide without opening the page: t
 
 ## Suppression
 
-An offer that is already sold out when first seen is recorded as seen but not notified. Novelty and notability are distinct: recording prevents a later re-notification, while notifying about something already unavailable is noise.
+The search detection issues already excludes sold-out offers, so routing rarely sees one. Should an offer arrive already sold out when first seen, it is recorded as seen but not notified. Novelty and notability are distinct: recording prevents a later re-notification, while notifying about something already unavailable is noise.
 
 ## Decisions & Alternatives
 
@@ -68,7 +68,7 @@ An offer that is already sold out when first seen is recorded as seen but not no
 | Keyword matching | Word-boundary match on reduced forms | Whole-word set membership; plain substring | Set membership makes multi-word keywords dead; plain substring matches inside longer words. |
 | Punctuation | Word break | Stripped before comparison | Stripping would conflate distinct brand spellings; a break keeps them separate and lets a configuration list both. |
 | Empty keywords | Discarded at registration | Allowed to match everything; rejected as a config error | A keyword reducing to nothing is a typo, not an intent to match all offers; discarding is quieter than failing to start. |
-| Sold-out offers | Recorded, not notified | Notified; not recorded | Recording prevents re-notification later; notifying about something unavailable is noise. [inferred] |
+| Sold-out offers reaching routing | Recorded, not notified | Notified; not recorded; no check, trusting the search's exclusion | Recording prevents re-notification later; notifying about something unavailable is noise. The check costs nothing and holds if the search's exclusion and an offer's sold-out flag ever disagree. |
 | Delivery failures | Logged and dropped, per channel | Retried; queued; abort remaining channels | Nothing can be done about a rejected webhook, and stalling or aborting would cost the channels that would have succeeded. |
 | Duplicate endpoints | Sent once per declaring entry | Deduplicated across entries | Which entries feed an endpoint is the operator's arrangement to make. |
 | Channel with no endpoint | Silently inert | Warn; reject as a config error | Omitting an endpoint is the means of disabling a channel, so it is ordinary rather than exceptional. |
@@ -83,10 +83,11 @@ An offer that is already sold out when first seen is recorded as seen but not no
 1. A scraping outage routes all traffic to `unverified` with no distinct signal. Whether that warrants its own alert is unsettled.
 2. Delivery failures are dropped silently. Discord rate limits during a large batch of new offers are the likely cause and are not currently visible.
 3. An entry configuring keywords but no watchlist endpoint is inert with no signal. A startup warning would make the dead configuration visible.
-3. The review-count minimum is a single global threshold, not per-webhook.
+4. The review-count minimum is a single global threshold, not per-webhook.
 
 ## References
 
 - `docs/high-level-design.md` — segment boundaries and tenets.
+- `docs/intent/detection/detection-design.md` — which offers the search reads, including its sold-out exclusion.
 - `docs/intent/fetching/fetching-design.md` — where the ASIN and review count come from.
 - `docs/intent/config/config-design.md` — how webhook entries are declared.

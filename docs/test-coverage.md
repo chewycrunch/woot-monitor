@@ -1,10 +1,10 @@
 # Specs without tests
 
-27 of the 86 implemented specs are verified by a test. The other 59 are cited only by the code that realizes them.
+29 of the 88 implemented specs are verified by a test. The other 59 are cited only by the code that realizes them.
 
 | Segment | Implemented | Tested | Untested |
 |---|---|---|---|
-| detection | 29 | 8 | 21 |
+| detection | 31 | 10 | 21 |
 | routing | 22 | 9 | 13 |
 | fetching | 19 | 5 | 14 |
 | config | 16 | 5 | 11 |

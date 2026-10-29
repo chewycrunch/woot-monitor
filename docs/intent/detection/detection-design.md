@@ -9,7 +9,15 @@ prefix: DETECTION
 
 Detection decides *when* the monitor looks at Woot, *how much* of the catalogue it reads, and *what counts as new*. Everything downstream — routing, notification — is driven by the set of offers this segment declares novel.
 
-Woot offers no change feed, so novelty is established by difference: read the catalogue, compare against what has been seen, treat the remainder as new. The design problem is that the catalogue is larger than the search API will paginate and larger than the proxy budget wants to read every few seconds. Detection therefore reads a bounded prefix of the catalogue rather than all of it, and the correctness of that bound is this segment's central concern.
+Woot offers no change feed, so novelty is established by difference: read the catalogue, compare against what has been seen, treat the remainder as new. The design problem is that the catalogue is larger than the proxy budget wants to read every few seconds, and can grow past what the search API will paginate. Detection therefore reads a bounded prefix of the catalogue rather than all of it, and the correctness of that bound is this segment's central concern.
+
+## Catalogue scope
+
+The search reads every category Woot lists. Its one filter is the search's own exclusion of sold-out offers.
+
+Reading every category follows from preferring a false alarm to a missed offer. A category allowlist silently drops any offer whose category it does not name — offers carrying no category at all, and any category Woot introduces later. The cost is offers few operators want, chiefly Woot's shirt designs, which have no Amazon listing behind them and so notify as unverified.
+
+Excluding sold-out offers at the search, rather than reading and discarding them, decides what a restock does. An offer first listed already sold out is never read, so it is never recorded; if it returns to stock while its start date is still within the lookback, the next poll reads it and it is new. Recorded at first sight instead, it would count as seen and its restock would produce nothing.
 
 ## Catalogue ordering
 
@@ -25,7 +33,7 @@ Monotonicity is what makes a date-bounded read sound: all offers at or after any
 
 Woot rejects any search whose `Skip + Limit` exceeds 10,000, inclusively: `Skip: 9800, Limit: 200` succeeds and `Skip: 10000, Limit: 200` fails the whole request rather than returning a short page. With a page size of 200 the deepest readable page therefore begins at offset 9,800, and paging reaches exactly 10,000 offers.
 
-The catalogue is larger than that. Offers beyond the ceiling are unreachable by any query, so the sort order determines *which* offers are lost: newest-first makes the unreachable tail the oldest offers, which are by definition not new. Under any other sort the unreachable tail could contain newly listed offers.
+The catalogue's size varies, and nothing holds it below the ceiling. Whenever it exceeds the ceiling, the offers beyond it are unreachable by any query, so the sort order determines *which* offers are lost: newest-first makes the unreachable tail the oldest offers, which are by definition not new. Under any other sort the unreachable tail could contain newly listed offers.
 
 ## Bounding a poll
 
@@ -39,7 +47,7 @@ Bounding by novelty instead — stopping once a page contains only already-seen 
 
 ## Startup and steady state
 
-Startup reads the whole reachable catalogue and records it without notifying. This establishes both the seen-set and the initial high-water mark; without it the first poll would treat 10,000 existing offers as new.
+Startup reads the whole reachable catalogue and records it without notifying. This establishes both the seen-set and the initial high-water mark; without it the first poll would treat every existing offer as new.
 
 Startup failure is retried with exponential backoff, indefinitely, rather than being fatal. The interval doubles to a ceiling and then holds; there is no attempt limit, so a durably broken upstream leaves the monitor retrying at that cadence rather than exiting. The steady-state loop already tolerates a failed read and continues to the next poll, so treating the identical failure as fatal at startup only converts a recoverable blip into a process exit — and, under a container restart policy, into a restart loop that reports as running.
 
@@ -71,6 +79,8 @@ An offer is new when its identifier has not been recorded before. Only first app
 
 | Decision | Chosen | Alternatives Considered | Rationale |
 |---|---|---|---|
+| Catalogue scope | Every category | A category allowlist; reading everything and dropping unwanted categories in the monitor | An allowlist silently drops uncategorised offers and any category added later. Dropping categories in the monitor is the same judgement made as a filter no operator configured; an unwanted offer costs a glance. |
+| Sold-out offers | Excluded by the search | Read, recorded, and not notified | An offer first listed sold out stays unrecorded, so a restock within the lookback reads as new. Recording it at first sight would silence the restock. |
 | Ordering | `NewestFirst` | `BestSelling` | Under a depth ceiling the sort decides which offers are unreachable. Newest-first strands the oldest; best-selling strands the worst-selling, which is where a newly listed offer sits. |
 | Poll bound | Date cutoff | Stop at first seen offer; full sweep | Batch-internal order is arbitrary, so novelty-bounding steps over new offers. A full sweep is correct but reads the whole catalogue every cycle. |
 | Cutoff margin | Fixed lookback behind the high-water mark | No margin | Offers are observed appearing with start dates behind the mark; without a margin those are read past and lost. |
@@ -92,7 +102,7 @@ An offer is new when its identifier has not been recorded before. Only first app
 ### Deferred
 1. The staleness margin is derived from the poll interval rather than measured against real read durations, so an unusually slow read could report unhealthy while still working.
 2. The maximum backdating interval is unknown. The lookback margin is sized generously rather than empirically; an offer backdated beyond it would be missed silently.
-3. The catalogue grows over time, widening the unreachable tail. There is no alert when it crosses a threshold, only a per-poll warning line.
+3. A catalogue past the ceiling has an unreachable tail. There is no alert when that happens, only a warning line on each read that reaches the ceiling.
 4. Restart re-reads and re-seeds silently. Whether an operator wants missed offers replayed after downtime is unsettled; the current answer is no.
 
 ## References
